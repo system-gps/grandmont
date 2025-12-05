@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小學生流程圖製作大師 v3.3 (完美預覽版)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f0f9ff;
+            overflow: hidden;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #canvas-container {
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .tool-btn {
+            transition: all 0.2s;
+        }
+        .tool-btn:active {
+            transform: scale(0.95);
+        }
+        .tool-btn.active {
+            ring-width: 3px;
+            ring-color: #3b82f6;
+            background-color: #eff6ff;
+            border-color: #3b82f6;
+        }
+
+        .template-btn {
+            @apply flex flex-col items-center justify-center p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:shadow-md transition-all cursor-pointer;
+        }
+
+        #text-input {
+            position: absolute;
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #3b82f6;
+            text-align: center;
+            outline: none;
+            color: #1e293b;
+            font-weight: bold;
+            padding: 4px;
+            z-index: 50;
+            border-radius: 8px;
+            resize: none;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        #preview-tooltip {
+            position: absolute;
+            display: none;
+            background: white;
+            border: 2px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        /* Modal Styles */
+        #help-modal {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        /* 自動儲存提示 */
+        #save-status {
+            transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white shadow-md p-2 px-4 flex justify-between items-center z-10 border-b border-slate-200">
+        <div class="flex items-center gap-2 md:gap-3">
+            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-2 rounded-xl shadow-md">
+                <i class="fa-solid fa-shapes fa-lg"></i>
+            </div>
+            <div>
+                <h1 class="text-lg md:text-xl font-bold text-slate-800 tracking-tight">流程圖大師 <span class="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">v3.3</span></h1>
+            </div>
+            <span id="save-status" class="text-xs text-green-600 font-bold opacity-0 ml-2 hidden md:inline-block">
+                <i class="fa-solid fa-check"></i> 已自動儲存
+            </span>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="toggleHelp()" class="bg-yellow-400 text-yellow-900 hover:bg-yellow-500 px-3 py-2 rounded-lg font-bold shadow-sm transition flex items-center text-sm md:text-base">
+                <i class="fa-solid fa-book-open md:mr-2"></i><span class="hidden md:inline">教學</span>
+            </button>
+            <button onclick="clearCanvas()" class="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg font-bold transition flex items-center border border-red-100 text-sm md:text-base">
+                <i class="fa-solid fa-trash-can md:mr-2"></i><span class="hidden md:inline">清空</span>
+            </button>
+            <button onclick="downloadImage()" class="bg-blue-600 text-white hover:bg-blue-700 px-3 py-2 rounded-lg font-bold shadow-md hover:shadow-lg transition flex items-center text-sm md:text-base">
+                <i class="fa-solid fa-image md:mr-2"></i><span class="hidden md:inline">存圖</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden relative">
+        <!-- Preview Tooltip -->
+        <div id="preview-tooltip">
+            <div class="text-xs font-bold text-slate-500 mb-1 text-center">預覽</div>
+            <canvas id="previewCanvas" width="220" height="220" class="bg-slate-50 rounded border border-slate-100"></canvas>
+        </div>
+
+        <!-- Help Modal -->
+        <div id="help-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all scale-100">
+                <!-- Modal Header -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-t-2xl flex justify-between items-center sticky top-0 z-10">
+                    <h2 class="text-white text-xl font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-graduation-cap"></i> 
+                        小設計師秘籍
+                    </h2>
+                    <button onclick="toggleHelp()" class="text-white hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                
+                <!-- Modal Content -->
+                <div class="p-6 space-y-6">
+                    <!-- Section 1 -->
+                    <div class="flex gap-4">
+                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 text-green-600 text-xl">
+                            <i class="fa-solid fa-shapes"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-slate-800 mb-2">1. 基礎操作</h3>
+                            <ul class="text-sm text-slate-600 space-y-1 list-disc pl-4">
+                                <li>點擊左邊的按鈕，或者直接<strong>拖拉</strong>到畫面上來增加圖形。</li>
+                                <li>在圖形上<strong>點兩下 (雙擊)</strong> 就可以打字寫入內容。</li>
+                                <li>不想要的圖形，點選它然後按鍵盤的 <strong>Delete</strong> 鍵，或是點左邊的垃圾桶。</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Section 2 -->
+                    <div class="flex gap-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 text-blue-600 text-xl">
+                            <i class="fa-solid fa-draw-polygon"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-slate-800 mb-2">2. 連線高手</h3>
+                            <ul class="text-sm text-slate-600 space-y-1 list-disc pl-4">
+                                <li>按下<strong>「連線模式」</strong>，或者按住鍵盤的 <strong>Shift</strong> 鍵，就可以從一個圖形拉線到另一個圖形。</li>
+                                <li><span class="bg-yellow-100 text-yellow-800 px-1 rounded font-bold">進階</span> 點選一條線，你會看到頭尾有<strong>藍色小圓點</strong>，拖拉它們可以改變連接的位置喔！</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Section 3 -->
+                    <div class="flex gap-4">
+                        <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 text-orange-600 text-xl">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-slate-800 mb-2">3. 判斷題與技巧</h3>
+                            <ul class="text-sm text-slate-600 space-y-1 list-disc pl-4">
+                                <li>當你從菱形（判斷）拉出線時，線上會有一個圓圈。</li>
+                                <li><strong>點擊圓圈</strong>：可以切換「是」或「否」。</li>
+                                <li><strong>拖曳圓圈</strong>：可以沿著線滑動，把它移到不擋路的地方。</li>
+                                <li><strong>多選技巧</strong>：在空白處按住滑鼠拖曳畫框框，可以一次選取好多圖形一起移動或縮放！</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-4 bg-slate-50 rounded-b-2xl border-t border-slate-100 text-center">
+                    <button onclick="toggleHelp()" class="bg-blue-600 text-white px-8 py-2 rounded-full font-bold hover:bg-blue-700 shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5">
+                        我學會了！開始製作
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white shadow-xl p-4 flex flex-col gap-4 z-10 overflow-y-auto border-r border-slate-200 scrollbar-hide">
+            
+            <!-- Templates -->
+            <div>
+                <h2 class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <i class="fa-solid fa-wand-magic-sparkles text-yellow-500"></i> 快速範本
+                </h2>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="loadTemplate(1)" onmouseenter="showPreview(1, this)" onmouseleave="hidePreview()" class="template-btn group">
+                        <div class="w-8 h-8 rounded border-2 border-slate-300 flex items-center justify-center mb-1 group-hover:border-blue-400 bg-green-50">
+                            <span class="font-bold text-slate-400 text-xs group-hover:text-blue-500">1</span>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-600">單一判斷</span>
+                    </button>
+                    <button onclick="loadTemplate(2)" onmouseenter="showPreview(2, this)" onmouseleave="hidePreview()" class="template-btn group">
+                        <div class="w-8 h-8 rounded border-2 border-slate-300 flex items-center justify-center mb-1 group-hover:border-blue-400 bg-orange-50">
+                            <span class="font-bold text-slate-400 text-xs group-hover:text-blue-500">2</span>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-600">雙層判斷</span>
+                    </button>
+                    <button onclick="loadTemplate(3)" onmouseenter="showPreview(3, this)" onmouseleave="hidePreview()" class="template-btn group">
+                        <div class="w-8 h-8 rounded border-2 border-slate-300 flex items-center justify-center mb-1 group-hover:border-blue-400 bg-blue-50">
+                            <span class="font-bold text-slate-400 text-xs group-hover:text-blue-500">3</span>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-600">連續檢查</span>
+                    </button>
+                </div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <!-- Shapes -->
+            <div>
+                <h2 class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">添加形狀</h2>
+                <div class="space-y-2">
+                    <button onclick="addShape('start')" class="tool-btn w-full flex items-center gap-3 p-2 border border-slate-200 rounded-xl bg-white hover:shadow-md text-left group">
+                        <div class="w-10 h-6 rounded-full bg-green-100 border-2 border-green-500 group-hover:bg-green-200 transition"></div>
+                        <div>
+                            <div class="font-bold text-slate-700 text-sm">開始 / 結束</div>
+                        </div>
+                    </button>
+
+                    <button onclick="addShape('process')" class="tool-btn w-full flex items-center gap-3 p-2 border border-slate-200 rounded-xl bg-white hover:shadow-md text-left group">
+                        <div class="w-10 h-6 bg-blue-100 border-2 border-blue-500 rounded-sm group-hover:bg-blue-200 transition"></div>
+                        <div>
+                            <div class="font-bold text-slate-700 text-sm">處理步驟</div>
+                        </div>
+                    </button>
+
+                    <button onclick="addShape('decision')" class="tool-btn w-full flex items-center gap-3 p-2 border border-slate-200 rounded-xl bg-white hover:shadow-md text-left group">
+                        <div class="w-8 h-8 bg-orange-100 border-2 border-orange-500 transform rotate-45 ml-1 group-hover:bg-orange-200 transition"></div>
+                        <div class="ml-2">
+                            <div class="font-bold text-slate-700 text-sm">判斷 / 決定</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <!-- Tools -->
+            <div>
+                <h2 class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">工具</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-select" onclick="setMode('select')" class="tool-btn active p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-bold flex flex-col items-center justify-center gap-1">
+                        <i class="fa-solid fa-arrow-pointer text-lg"></i>
+                        <span class="text-xs">移動 / 選取</span>
+                    </button>
+                    <button id="btn-link" onclick="setMode('link')" class="tool-btn p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-bold flex flex-col items-center justify-center gap-1">
+                        <i class="fa-solid fa-draw-polygon text-lg"></i>
+                        <span class="text-xs">連線模式</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Context Tools -->
+            <div id="context-tools" class="hidden bg-indigo-50 p-3 rounded-xl border border-indigo-100 animate-fade-in transition-all">
+                <h2 class="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">已選取項目設定</h2>
+                
+                <div class="mb-3">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-indigo-900">文字大小 (選取)</span>
+                        <div class="flex gap-1">
+                            <button onclick="adjustFontSize(-2, false)" class="w-6 h-6 bg-white rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-100 font-bold flex items-center justify-center text-xs"><i class="fa-solid fa-minus"></i></button>
+                            <button onclick="adjustFontSize(2, false)" class="w-6 h-6 bg-white rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-100 font-bold flex items-center justify-center text-xs"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-500">文字大小 (全部)</span>
+                        <div class="flex gap-1">
+                            <button onclick="adjustFontSize(-2, true)" class="w-6 h-6 bg-slate-200 rounded border border-slate-300 text-slate-600 hover:bg-slate-300 font-bold flex items-center justify-center text-xs"><i class="fa-solid fa-minus"></i></button>
+                            <button onclick="adjustFontSize(2, true)" class="w-6 h-6 bg-slate-200 rounded border border-slate-300 text-slate-600 hover:bg-slate-300 font-bold flex items-center justify-center text-xs"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="deleteSelected()" class="w-full bg-red-100 hover:bg-red-200 text-red-600 border border-red-200 py-1.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition">
+                    <i class="fa-solid fa-trash"></i> 刪除選取項目
+                </button>
+            </div>
+            
+            <div class="mt-auto bg-yellow-50 p-3 rounded-xl border border-yellow-200 text-xs text-yellow-800 shadow-sm">
+                <p class="font-bold mb-1 flex items-center gap-2"><i class="fa-regular fa-lightbulb text-yellow-600"></i> 小提示：</p>
+                <ul class="list-disc pl-4 space-y-1 opacity-90">
+                    <li>需要幫忙嗎？點擊上方的「教學」按鈕。</li>
+                    <li>所有進度都會自動儲存喔！</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Canvas -->
+        <main id="canvas-wrapper" class="flex-1 relative bg-slate-50 overflow-hidden cursor-crosshair touch-none">
+            <canvas id="flowchartCanvas" class="touch-none"></canvas>
+            <textarea id="text-input" onblur="finishEditing()" onkeydown="handleInputKey(event)"></textarea>
+        </main>
+    </div>
+
+<script>
+    const canvas = document.getElementById('flowchartCanvas');
+    const ctx = canvas.getContext('2d');
+    const wrapper = document.getElementById('canvas-wrapper');
+    const textInput = document.getElementById('text-input');
+    const contextTools = document.getElementById('context-tools');
+    const saveStatus = document.getElementById('save-status');
+    const helpModal = document.getElementById('help-modal');
+    
+    // Preview Elements
+    const previewTooltip = document.getElementById('preview-tooltip');
+    const previewCanvas = document.getElementById('previewCanvas');
+    const previewCtx = previewCanvas.getContext('2d');
+
+    // --- Constants ---
+    const STORAGE_KEY = 'flowchart_kids_autosave_v3';
+    const HANDLE_SIZE = 12; 
+    const CONN_HANDLE_SIZE = 10;
+    const LABEL_RADIUS = 12; // Reduced size for cleaner look
+    
+    const SHAPE_DEFAULTS = {
+        start: { w: 120, h: 60, bg: '#dcfce7', stroke: '#16a34a', text: '開始' },
+        process: { w: 120, h: 60, bg: '#dbeafe', stroke: '#2563eb', text: '步驟' },
+        decision: { w: 100, h: 100, bg: '#ffedd5', stroke: '#ea580c', text: '判斷' }
+    };
+
+    // --- State ---
+    let shapes = [];
+    let connections = [];
+    let currentMode = 'select'; 
+    let selection = []; 
+    let selectedConnection = null;
+
+    let isDragging = false;
+    let dragStartPos = {x:0, y:0};
+    let dragOffsets = []; 
+
+    let isBoxSelecting = false;
+    let boxStartPos = {x:0, y:0};
+    let boxCurrentPos = {x:0, y:0};
+    
+    let isResizing = false;
+    let resizeHandleIndex = -1; 
+    let initialGroupBounds = null; 
+    let initialShapesState = [];
+
+    let isEditingConnection = false;
+    let connDragHandle = null; 
+    let connDragMousePos = {x:0, y:0};
+
+    let draggedLabelConn = null;
+    let isLabelMoved = false;
+
+    let isLinking = false;
+    let linkStartShape = null;
+    let mousePos = {x:0, y:0}; 
+
+    // --- Initialization ---
+    const resizeObserver = new ResizeObserver(() => {
+        canvas.width = wrapper.clientWidth;
+        canvas.height = wrapper.clientHeight;
+        draw();
+    });
+    resizeObserver.observe(wrapper);
+
+    window.onload = function() {
+        loadState(); // Auto-load
+        if(shapes.length === 0) {
+            // Optional: toggleHelp(); 
+        }
+    };
+
+    // --- Help Modal Logic ---
+    function toggleHelp() {
+        const modal = document.getElementById('help-modal');
+        if (modal.classList.contains('hidden')) {
+            modal.classList.remove('hidden');
+        } else {
+            modal.classList.add('hidden');
+        }
+    }
+
+    // --- Geometry Helpers ---
+    function getDist(p1, p2) { return Math.hypot(p2.x - p1.x, p2.y - p1.y); }
+
+    function projectPointOnSegment(p1, p2, p) {
+        const l2 = (p2.x - p1.x)**2 + (p2.y - p1.y)**2;
+        if (l2 == 0) return { point: p1, t: 0, dist: getDist(p, p1) };
+        let t = ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        const proj = { x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y) };
+        return { point: proj, t: t, dist: getDist(p, proj) };
+    }
+
+    function getPorts(shape) {
+        const hw = shape.width / 2;
+        const hh = shape.height / 2;
+        return [
+            { x: shape.x, y: shape.y - hh, side: 'top' },
+            { x: shape.x + hw, y: shape.y, side: 'right' },
+            { x: shape.x, y: shape.y + hh, side: 'bottom' },
+            { x: shape.x - hw, y: shape.y, side: 'left' }
+        ];
+    }
+
+    function getOrthogonalPath(p1, p2) {
+        const points = [{x: p1.x, y: p1.y}];
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        if (Math.abs(dx) < 2 || Math.abs(dy) < 2) {
+            points.push({x: p2.x, y: p2.y});
+            return points;
+        }
+        if ((p1.side === 'top' || p1.side === 'bottom') && (p2.side === 'top' || p2.side === 'bottom')) {
+            const midY = p1.y + dy / 2;
+            points.push({x: p1.x, y: midY});
+            points.push({x: p2.x, y: midY});
+        } 
+        else if ((p1.side === 'left' || p1.side === 'right') && (p2.side === 'left' || p2.side === 'right')) {
+            const midX = p1.x + dx / 2;
+            points.push({x: midX, y: p1.y});
+            points.push({x: midX, y: p2.y});
+        } 
+        else {
+            if (p1.side === 'top' || p1.side === 'bottom') { points.push({x: p1.x, y: p2.y}); } 
+            else { points.push({x: p2.x, y: p1.y}); }
+        }
+        points.push({x: p2.x, y: p2.y});
+        return points;
+    }
+
+    function distToPolyline(p, points) {
+        let minD = Infinity;
+        for (let i = 0; i < points.length - 1; i++) {
+            const d = distToSegment(p, points[i], points[i+1]);
+            if (d < minD) minD = d;
+        }
+        return minD;
+    }
+
+    function distToSegment(p, v, w) {
+        const l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
+        if (l2 == 0) return Math.sqrt((p.x - v.x)**2 + (p.y - v.y)**2);
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt((p.x - (v.x + t * (w.x - v.x)))**2 + (p.y - (v.y + t * (w.y - v.y)))**2);
+    }
+
+    function getSelectionBounds() {
+        if (selection.length === 0) return null;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        selection.forEach(s => {
+            minX = Math.min(minX, s.x - s.width/2);
+            maxX = Math.max(maxX, s.x + s.width/2);
+            minY = Math.min(minY, s.y - s.height/2);
+            maxY = Math.max(maxY, s.y + s.height/2);
+        });
+        return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY, minX, maxX, minY, maxY };
+    }
+
+    function getGroupHandles(bounds) {
+        const hw = bounds.w / 2;
+        const hh = bounds.h / 2;
+        return [
+            { x: bounds.x - hw, y: bounds.y - hh, cursor: 'nw-resize' }, 
+            { x: bounds.x + hw, y: bounds.y - hh, cursor: 'ne-resize' }, 
+            { x: bounds.x + hw, y: bounds.y + hh, cursor: 'se-resize' }, 
+            { x: bounds.x - hw, y: bounds.y + hh, cursor: 'sw-resize' }  
+        ];
+    }
+
+    // --- Classes ---
+
+    class Shape {
+        constructor(x, y, type, text) {
+            this.id = Date.now() + Math.random();
+            this.x = x;
+            this.y = y;
+            this.type = type;
+            this.width = SHAPE_DEFAULTS[type].w;
+            this.height = SHAPE_DEFAULTS[type].h;
+            this.color = SHAPE_DEFAULTS[type].bg;
+            this.stroke = SHAPE_DEFAULTS[type].stroke;
+            this.text = text || SHAPE_DEFAULTS[type].text;
+            this.fontSize = 16;
+        }
+
+        draw(ctx, isPreview = false) {
+            ctx.save();
+            ctx.fillStyle = this.color;
+            ctx.strokeStyle = this.stroke;
+            ctx.lineWidth = isPreview ? 2 : 3;
+
+            if (!isPreview && selection.includes(this)) {
+                ctx.shadowColor = 'rgba(59, 130, 246, 0.4)';
+                ctx.shadowBlur = 10;
+                ctx.strokeStyle = '#2563eb';
+            }
+
+            ctx.beginPath();
+            if (this.type === 'start') {
+                ctx.roundRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height, this.height/2);
+            } else if (this.type === 'process') {
+                ctx.roundRect(this.x - this.width/2, this.y - this.height/2, this.width, this.height, 8);
+            } else if (this.type === 'decision') {
+                ctx.moveTo(this.x, this.y - this.height/2);
+                ctx.lineTo(this.x + this.width/2, this.y);
+                ctx.lineTo(this.x, this.y + this.height/2);
+                ctx.lineTo(this.x - this.width/2, this.y);
+                ctx.closePath();
+            }
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.fillStyle = '#1e293b';
+            const fs = isPreview ? Math.max(10, this.fontSize * 0.6) : this.fontSize;
+            ctx.font = `bold ${fs}px "Noto Sans TC"`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const lines = this.text.split('\n');
+            const lineHeight = fs * 1.3;
+            const startY = this.y - ((lines.length - 1) * lineHeight) / 2;
+            lines.forEach((line, i) => {
+                ctx.fillText(line, this.x, startY + i * lineHeight);
+            });
+        }
+
+        contains(x, y) {
+            return Math.abs(x - this.x) <= this.width/2 && Math.abs(y - this.y) <= this.height/2;
+        }
+
+        intersectsRect(rect) {
+            const left = this.x - this.width/2;
+            const right = this.x + this.width/2;
+            const top = this.y - this.height/2;
+            const bottom = this.y + this.height/2;
+            return !(left > rect.x + rect.w || right < rect.x || top > rect.y + rect.h || bottom < rect.y);
+        }
+    }
+
+    class Connection {
+        constructor(from, to, labelState = 0, fromSide = null, toSide = null) {
+            this.id = Date.now() + Math.random();
+            this.from = from;
+            this.to = to;
+            this.labelState = (from.type === 'decision') ? labelState : 0; 
+            this.lastPath = [];
+            this.fromSide = fromSide;
+            this.toSide = toSide;
+            this.labelDist = 35; 
+        }
+
+        getLabelText() {
+            if (this.from.type !== 'decision') return null;
+            if (this.labelState === 1) return '是';
+            if (this.labelState === 2) return '否';
+            return null;
+        }
+
+        getLabelCenter() {
+            if (this.from.type !== 'decision' || this.lastPath.length < 2) return null;
+            let remaining = this.labelDist;
+            for (let i = 0; i < this.lastPath.length - 1; i++) {
+                const p1 = this.lastPath[i];
+                const p2 = this.lastPath[i+1];
+                const segLen = getDist(p1, p2);
+                if (remaining <= segLen) {
+                    const t = remaining / segLen;
+                    return { x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y) };
+                }
+                remaining -= segLen;
+            }
+            const pLast = this.lastPath[this.lastPath.length - 1];
+            const pPrev = this.lastPath[this.lastPath.length - 2];
+            const totalLen = getDist(pLast, pPrev);
+            const t = Math.max(0, (totalLen - 15) / totalLen);
+            return { x: pPrev.x + t * (pLast.x - pPrev.x), y: pPrev.y + t * (pLast.y - pPrev.y) };
+        }
+
+        calculateBestPath() {
+            let ports1 = getPorts(this.from);
+            let ports2 = getPorts(this.to);
+            if (this.fromSide) ports1 = ports1.filter(p => p.side === this.fromSide);
+            if (this.toSide) ports2 = ports2.filter(p => p.side === this.toSide);
+            if (ports1.length === 0) ports1 = getPorts(this.from);
+            if (ports2.length === 0) ports2 = getPorts(this.to);
+
+            let minD = Infinity;
+            let p1 = ports1[0], p2 = ports2[0];
+            ports1.forEach(pt1 => {
+                ports2.forEach(pt2 => {
+                    const d = Math.hypot(pt1.x - pt2.x, pt1.y - pt2.y);
+                    if (d < minD) { minD = d; p1 = pt1; p2 = pt2; }
+                });
+            });
+            return getOrthogonalPath(p1, p2);
+        }
+
+        draw(ctx, isPreview = false) {
+            const path = this.calculateBestPath();
+            this.lastPath = path;
+
+            ctx.save();
+            ctx.strokeStyle = (!isPreview && this === selectedConnection) ? '#ef4444' : '#64748b';
+            ctx.lineWidth = (!isPreview && this === selectedConnection) ? 4 : 2;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.setLineDash([]); 
+
+            ctx.beginPath();
+            ctx.moveTo(path[0].x, path[0].y);
+            for (let i = 1; i < path.length; i++) {
+                ctx.lineTo(path[i].x, path[i].y);
+            }
+            ctx.stroke();
+
+            if (path.length > 1) {
+                const end = path[path.length - 1];
+                const prev = path[path.length - 2];
+                const angle = Math.atan2(end.y - prev.y, end.x - prev.x);
+                const headLen = isPreview ? 6 : 10;
+                ctx.beginPath();
+                ctx.moveTo(end.x, end.y);
+                ctx.lineTo(end.x - headLen * Math.cos(angle - Math.PI / 6), end.y - headLen * Math.sin(angle - Math.PI / 6));
+                ctx.lineTo(end.x - headLen * Math.cos(angle + Math.PI / 6), end.y - headLen * Math.sin(angle + Math.PI / 6));
+                ctx.fillStyle = ctx.strokeStyle;
+                ctx.fill();
+            }
+
+            const labelPos = this.getLabelCenter();
+            if (labelPos) {
+                // Reduced radius for cleaner look
+                const r = isPreview ? LABEL_RADIUS * 0.6 : LABEL_RADIUS;
+                ctx.beginPath();
+                ctx.arc(labelPos.x, labelPos.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.strokeStyle = '#ea580c';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                const txt = this.getLabelText();
+                if (txt) {
+                    ctx.fillStyle = (txt === '是') ? '#16a34a' : '#ef4444';
+                    // Smaller font
+                    ctx.font = isPreview ? `bold 9px "Noto Sans TC"` : `bold 12px "Noto Sans TC"`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(txt, labelPos.x, labelPos.y);
+                } else if (!isPreview) {
+                    ctx.fillStyle = '#cbd5e1'; 
+                    ctx.font = 'bold 16px sans-serif'; 
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('?', labelPos.x, labelPos.y); 
+                }
+            }
+            ctx.restore();
+        }
+
+        contains(x, y) { return distToPolyline({x, y}, this.lastPath) < 8; }
+        containsLabel(x, y) {
+            const labelPos = this.getLabelCenter();
+            if (!labelPos) return false;
+            return Math.sqrt((x-labelPos.x)**2 + (y-labelPos.y)**2) <= LABEL_RADIUS + 2; 
+        }
+    }
+
+    // --- Template Data Generator ---
+    function getTemplateData(id, centerX, startY) {
+        let tempShapes = [];
+        let tempConns = [];
+        const cx = centerX;
+        
+        if (id === 1) {
+            const s1 = new Shape(cx, startY, 'start', '開始');
+            const s2 = new Shape(cx, startY + 80, 'process', '動作 1');
+            const d1 = new Shape(cx, startY + 180, 'decision', '判斷?');
+            const sYes = new Shape(cx - 180, startY + 280, 'process', '是的情況');
+            const sNo = new Shape(cx + 180, startY + 280, 'process', '否的情況');
+            const sEnd = new Shape(cx, startY + 380, 'start', '結束');
+            
+            tempShapes = [s1, s2, d1, sYes, sNo, sEnd];
+            tempConns = [
+                new Connection(s1, s2),
+                new Connection(s2, d1),
+                new Connection(d1, sYes, 1, 'left', 'top'), 
+                new Connection(d1, sNo, 2, 'right', 'top'), 
+                new Connection(sYes, sEnd, 0, 'bottom', 'left'),
+                new Connection(sNo, sEnd, 0, 'bottom', 'right')
+            ];
+        } 
+        else if (id === 2) {
+            const s1 = new Shape(cx, startY, 'start', '開始');
+            const d1 = new Shape(cx, startY + 100, 'decision', '判斷?');
+            const d2 = new Shape(cx - 200, startY + 200, 'decision', '判斷?');
+            const d3 = new Shape(cx + 200, startY + 200, 'decision', '判斷?');
+            const pA = new Shape(cx - 280, startY + 320, 'process', '處理 A');
+            const pB = new Shape(cx - 120, startY + 320, 'process', '處理 B');
+            const pC = new Shape(cx + 120, startY + 320, 'process', '處理 C');
+            const pD = new Shape(cx + 280, startY + 320, 'process', '處理 D');
+            const sEnd = new Shape(cx, startY + 440, 'start', '結束');
+            
+            tempShapes = [s1, d1, d2, d3, pA, pB, pC, pD, sEnd];
+            tempConns = [
+                new Connection(s1, d1),
+                new Connection(d1, d2, 1, 'left', 'top'),  
+                new Connection(d1, d3, 2, 'right', 'top'), 
+                new Connection(d2, pA, 1, 'left', 'top'),  
+                new Connection(d2, pB, 2, 'right', 'top'), 
+                new Connection(d3, pC, 1, 'left', 'top'),  
+                new Connection(d3, pD, 2, 'right', 'top'), 
+                new Connection(pA, sEnd, 0, 'bottom', 'left'),
+                new Connection(pB, sEnd, 0, 'bottom', 'top'), 
+                new Connection(pC, sEnd, 0, 'bottom', 'top'),
+                new Connection(pD, sEnd, 0, 'bottom', 'right'),
+            ];
+        }
+        else if (id === 3) {
+            const s1 = new Shape(cx, startY, 'start', '開始');
+            const d1 = new Shape(cx, startY + 100, 'decision', '檢查 1');
+            const pNo1 = new Shape(cx + 200, startY + 100, 'process', '否的處理');
+            const d2 = new Shape(cx, startY + 220, 'decision', '檢查 2');
+            const pNo2 = new Shape(cx + 200, startY + 220, 'process', '否的處理');
+            const d3 = new Shape(cx, startY + 340, 'decision', '檢查 3');
+            const pNo3 = new Shape(cx + 200, startY + 340, 'process', '否的處理');
+            const pSuccess = new Shape(cx, startY + 460, 'process', '成功完成');
+            const sEnd = new Shape(cx, startY + 560, 'start', '結束');
+            
+            tempShapes = [s1, d1, pNo1, d2, pNo2, d3, pNo3, pSuccess, sEnd];
+            tempConns = [
+                new Connection(s1, d1),
+                new Connection(d1, pNo1, 2, 'right', 'left'), 
+                new Connection(d1, d2, 1, 'bottom', 'top'),   
+                new Connection(d2, pNo2, 2, 'right', 'left'),
+                new Connection(d2, d3, 1, 'bottom', 'top'),
+                new Connection(d3, pNo3, 2, 'right', 'left'),
+                new Connection(d3, pSuccess, 1, 'bottom', 'top'),
+                new Connection(pSuccess, sEnd)
+            ];
+        }
+        
+        return { shapes: tempShapes, connections: tempConns };
+    }
+
+    // --- Main Logic ---
+
+    function loadTemplate(id) {
+        if (!confirm('載入範本會清空目前的畫布，確定嗎？')) return;
+        
+        const cx = canvas.width / 2;
+        const cy = 80;
+        const data = getTemplateData(id, cx, cy);
+        
+        shapes = data.shapes;
+        connections = data.connections;
+        
+        selection = [];
+        selectedConnection = null;
+        isEditingConnection = false;
+        
+        updateUI();
+        draw();
+        saveState();
+    }
+
+    // --- Preview Logic (Refined) ---
+    
+    function showPreview(id, btnElement) {
+        const rect = btnElement.getBoundingClientRect();
+        previewTooltip.style.display = 'block';
+        previewTooltip.style.left = (rect.right + 10) + 'px';
+        previewTooltip.style.top = (rect.top - 50) + 'px';
+
+        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        
+        // Generate Template Data (using dummy coords initially)
+        const data = getTemplateData(id, 0, 0);
+        
+        // Calculate Bounding Box of the template
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        
+        // 1. Shapes
+        data.shapes.forEach(s => {
+            const halfW = s.width / 2 + 5; 
+            const halfH = s.height / 2 + 5;
+            minX = Math.min(minX, s.x - halfW);
+            maxX = Math.max(maxX, s.x + halfW);
+            minY = Math.min(minY, s.y - halfH);
+            maxY = Math.max(maxY, s.y + halfH);
+        });
+
+        // 2. Connections (Critical for "elbows" outside shapes)
+        data.connections.forEach(c => {
+            const path = c.calculateBestPath(); 
+            path.forEach(p => {
+                minX = Math.min(minX, p.x - 5); 
+                maxX = Math.max(maxX, p.x + 5);
+                minY = Math.min(minY, p.y - 5);
+                maxY = Math.max(maxY, p.y + 5);
+            });
+        });
+
+        // Add padding
+        const contentW = maxX - minX;
+        const contentH = maxY - minY;
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        const safeMargin = 20; 
+        const availableW = previewCanvas.width - (safeMargin * 2);
+        const availableH = previewCanvas.height - (safeMargin * 2);
+
+        const scaleX = availableW / contentW;
+        const scaleY = availableH / contentH;
+        const scale = Math.min(scaleX, scaleY, 0.6); 
+
+        previewCtx.save();
+        previewCtx.translate(previewCanvas.width / 2, previewCanvas.height / 2);
+        previewCtx.scale(scale, scale);
+        previewCtx.translate(-centerX, -centerY);
+
+        data.connections.forEach(c => c.draw(previewCtx, true));
+        data.shapes.forEach(s => s.draw(previewCtx, true));
+        
+        previewCtx.restore();
+    }
+
+    function hidePreview() {
+        previewTooltip.style.display = 'none';
+    }
+
+    // --- Auto Save Logic ---
+    function saveState() {
+        const data = {
+            shapes: shapes.map(s => ({
+                id: s.id, x: s.x, y: s.y, type: s.type, text: s.text, 
+                width: s.width, height: s.height, color: s.color, fontSize: s.fontSize
+            })),
+            connections: connections.map(c => ({
+                fromId: c.from.id,
+                toId: c.to.id,
+                labelState: c.labelState,
+                fromSide: c.fromSide,
+                toSide: c.toSide,
+                labelDist: c.labelDist
+            }))
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        
+        // Show indicator
+        saveStatus.style.opacity = '1';
+        setTimeout(() => { saveStatus.style.opacity = '0'; }, 2000);
+    }
+
+    function loadState() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        try {
+            const data = JSON.parse(raw);
+            shapes = data.shapes.map(d => {
+                const s = new Shape(d.x, d.y, d.type, d.text);
+                s.id = d.id; // Keep ID
+                s.width = d.width; s.height = d.height; s.color = d.color; s.fontSize = d.fontSize || 16;
+                return s;
+            });
+            connections = data.connections.map(d => {
+                const from = shapes.find(s => s.id === d.fromId);
+                const to = shapes.find(s => s.id === d.toId);
+                if (from && to) {
+                    const c = new Connection(from, to, d.labelState, d.fromSide, d.toSide);
+                    if(d.labelDist) c.labelDist = d.labelDist;
+                    return c;
+                }
+            }).filter(c => c);
+            draw();
+        } catch (e) {
+            console.error("Failed to load save", e);
+        }
+    }
+
+    // --- Input Handling (With Save Trigger) ---
+
+    function getPointerPos(e) {
+        const r = canvas.getBoundingClientRect();
+        const hasTouches = e.touches && e.touches.length > 0;
+        const clientX = hasTouches ? e.touches[0].clientX : e.clientX;
+        const clientY = hasTouches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - r.left, y: clientY - r.top };
+    }
+
+    function handleStart(pos, isShift) {
+        mousePos = pos;
+        
+        // 1. Check Selection Resize Handles
+        if (selection.length > 0) {
+            const bounds = getSelectionBounds();
+            const handles = getGroupHandles(bounds);
+            const hitHandle = handles.findIndex(h => 
+                Math.abs(pos.x - h.x) <= HANDLE_SIZE*1.5 && Math.abs(pos.y - h.y) <= HANDLE_SIZE*1.5
+            );
+            
+            if (hitHandle !== -1) {
+                isResizing = true;
+                resizeHandleIndex = hitHandle;
+                dragStartPos = pos;
+                initialGroupBounds = bounds;
+                initialShapesState = selection.map(s => ({
+                    s: s,
+                    x: s.x, y: s.y, w: s.width, h: s.height
+                }));
+                return;
+            }
+        }
+
+        // 2. Check Connection Drag Handles (Start/End)
+        if (selectedConnection && selectedConnection.lastPath.length > 1) {
+            const path = selectedConnection.lastPath;
+            const startPt = path[0];
+            const endPt = path[path.length - 1];
+
+            if (Math.hypot(pos.x - startPt.x, pos.y - startPt.y) <= CONN_HANDLE_SIZE * 1.5) {
+                isEditingConnection = true;
+                connDragHandle = 'start';
+                connDragMousePos = pos;
+                return;
+            }
+            if (Math.hypot(pos.x - endPt.x, pos.y - endPt.y) <= CONN_HANDLE_SIZE * 1.5) {
+                isEditingConnection = true;
+                connDragHandle = 'end';
+                connDragMousePos = pos;
+                return;
+            }
+        }
+
+        // 3. Check Connection Labels
+        const hitLabelConn = connections.find(c => c.containsLabel(pos.x, pos.y));
+        if (hitLabelConn) {
+            draggedLabelConn = hitLabelConn;
+            isLabelMoved = false; 
+            return;
+        }
+
+        // 4. Check Shapes
+        const hitShape = shapes.slice().reverse().find(s => s.contains(pos.x, pos.y));
+        if (hitShape) {
+            finishEditing();
+            
+            if (isShift || currentMode === 'link') {
+                isLinking = true;
+                linkStartShape = hitShape;
+                selection = [hitShape];
+                updateUI();
+                draw();
+                return;
+            }
+
+            if (!selection.includes(hitShape)) {
+                selection = [hitShape];
+            }
+            
+            isDragging = true;
+            dragStartPos = pos;
+            selectedConnection = null;
+            
+            dragOffsets = selection.map(s => ({
+                shape: s,
+                dx: pos.x - s.x,
+                dy: pos.y - s.y
+            }));
+
+            updateUI();
+            draw();
+            return;
+        }
+
+        // 5. Check Connections
+        const hitConn = connections.find(c => c.contains(pos.x, pos.y));
+        if (hitConn) {
+            selectedConnection = hitConn;
+            selection = [];
+            updateUI();
+            draw();
+            return;
+        }
+
+        // 6. Box Select
+        finishEditing();
+        selection = [];
+        selectedConnection = null;
+        
+        isBoxSelecting = true;
+        boxStartPos = pos;
+        boxCurrentPos = pos;
+        
+        updateUI();
+        draw();
+    }
+
+    function handleMove(pos) {
+        if (draggedLabelConn) {
+             const path = draggedLabelConn.lastPath;
+             let bestDist = 0;
+             let minD = Infinity;
+             let currentPathLen = 0;
+
+             for (let i = 0; i < path.length - 1; i++) {
+                 const p1 = path[i];
+                 const p2 = path[i+1];
+                 const proj = projectPointOnSegment(p1, p2, pos);
+                 if (proj.dist < minD) {
+                     minD = proj.dist;
+                     bestDist = currentPathLen + getDist(p1, proj.point);
+                 }
+                 currentPathLen += getDist(p1, p2);
+             }
+             
+             if (Math.abs(bestDist - draggedLabelConn.labelDist) > 1) {
+                 isLabelMoved = true;
+                 draggedLabelConn.labelDist = Math.max(10, Math.min(currentPathLen - 10, bestDist));
+                 draw();
+             }
+             return;
+        }
+
+        mousePos = pos;
+
+        if (isEditingConnection && selectedConnection) {
+            connDragMousePos = pos;
+            draw();
+            return;
+        }
+        
+        if (isResizing && selection.length > 0) {
+            const dx = pos.x - dragStartPos.x;
+            const hIdx = resizeHandleIndex;
+            const signX = (hIdx === 1 || hIdx === 2) ? 1 : -1;
+            
+            let newGroupW = initialGroupBounds.w + (dx * signX * 2);
+            if (newGroupW < 40) newGroupW = 40;
+
+            const scaleX = newGroupW / initialGroupBounds.w;
+            const scaleY = scaleX; 
+
+            initialShapesState.forEach(state => {
+                const s = state.s;
+                s.width = Math.max(20, state.w * scaleX);
+                s.height = Math.max(20, state.h * scaleY);
+                s.x = initialGroupBounds.x + (state.x - initialGroupBounds.x) * scaleX;
+                s.y = initialGroupBounds.y + (state.y - initialGroupBounds.y) * scaleY;
+            });
+
+            draw();
+            return;
+        }
+
+        if (isDragging) {
+            dragOffsets.forEach(item => {
+                item.shape.x = pos.x - item.dx;
+                item.shape.y = pos.y - item.dy;
+            });
+            draw();
+            return;
+        }
+
+        if (isBoxSelecting) {
+            boxCurrentPos = pos;
+            draw();
+            return;
+        }
+
+        if (isLinking) draw();
+    }
+
+    function handleEnd(e) {
+        if (e) {
+            const r = canvas.getBoundingClientRect();
+            let finalX, finalY;
+            if (e.changedTouches && e.changedTouches.length > 0) {
+                finalX = e.changedTouches[0].clientX;
+                finalY = e.changedTouches[0].clientY;
+            } else if (e.clientX !== undefined) {
+                finalX = e.clientX;
+                finalY = e.clientY;
+            }
+            if (finalX !== undefined) {
+                mousePos = { x: finalX - r.left, y: finalY - r.top };
+            }
+        }
+
+        // Only save if action actually happened
+        let shouldSave = false;
+
+        if (draggedLabelConn) {
+            if (!isLabelMoved) {
+                draggedLabelConn.labelState = (draggedLabelConn.labelState + 1) % 3;
+                if (draggedLabelConn.labelState === 0) draggedLabelConn.labelState = 1;
+                else if (draggedLabelConn.labelState === 2) draggedLabelConn.labelState = 0; 
+                else draggedLabelConn.labelState = 2;
+                draw();
+            }
+            draggedLabelConn = null;
+            isLabelMoved = false;
+            shouldSave = true;
+        }
+
+        else if (isEditingConnection && selectedConnection) {
+            const hitShape = shapes.slice().reverse().find(s => s.contains(mousePos.x, mousePos.y));
+            if (hitShape) {
+                const ports = getPorts(hitShape);
+                let bestPort = ports[0];
+                let minD = Infinity;
+                ports.forEach(p => {
+                    const d = Math.hypot(p.x - mousePos.x, p.y - mousePos.y);
+                    if (d < minD) { minD = d; bestPort = p; }
+                });
+
+                if (connDragHandle === 'start') {
+                    if (hitShape !== selectedConnection.to) {
+                        selectedConnection.from = hitShape;
+                        selectedConnection.fromSide = bestPort.side;
+                    } else if (hitShape === selectedConnection.to) {
+                         selectedConnection.fromSide = bestPort.side;
+                    }
+                } else {
+                    if (hitShape !== selectedConnection.from) {
+                        selectedConnection.to = hitShape;
+                        selectedConnection.toSide = bestPort.side;
+                    } else {
+                        selectedConnection.toSide = bestPort.side;
+                    }
+                }
+            }
+            isEditingConnection = false;
+            connDragHandle = null;
+            draw();
+            shouldSave = true;
+        }
+
+        else if (isBoxSelecting) {
+            const minX = Math.min(boxStartPos.x, boxCurrentPos.x);
+            const maxX = Math.max(boxStartPos.x, boxCurrentPos.x);
+            const minY = Math.min(boxStartPos.y, boxCurrentPos.y);
+            const maxY = Math.max(boxStartPos.y, boxCurrentPos.y);
+            const rect = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+            if (rect.w > 5 && rect.h > 5) {
+                selection = shapes.filter(s => s.intersectsRect(rect));
+            }
+            isBoxSelecting = false;
+            updateUI();
+            draw();
+        }
+
+        else if (isLinking && linkStartShape) {
+            const hitShape = shapes.slice().reverse().find(s => s.contains(mousePos.x, mousePos.y));
+            if (hitShape && hitShape !== linkStartShape) {
+                if (!connections.some(c => c.from === linkStartShape && c.to === hitShape)) {
+                    connections.push(new Connection(linkStartShape, hitShape));
+                    shouldSave = true;
+                }
+            }
+        }
+        
+        else if (isDragging || isResizing) {
+            shouldSave = true;
+        }
+        
+        isDragging = false;
+        isLinking = false;
+        isResizing = false;
+        linkStartShape = null;
+        draw();
+
+        if (shouldSave) saveState();
+    }
+
+    // --- Events ---
+    canvas.addEventListener('mousedown', e => handleStart(getPointerPos(e), e.shiftKey));
+    canvas.addEventListener('mousemove', e => {
+        handleMove(getPointerPos(e));
+        updateCursor(getPointerPos(e), e.shiftKey);
+    });
+    
+    window.addEventListener('mouseup', handleEnd); 
+    canvas.addEventListener('touchstart', e => { if(e.touches.length === 1) { e.preventDefault(); handleStart(getPointerPos(e), false); } }, {passive: false});
+    canvas.addEventListener('touchmove', e => { if(e.touches.length === 1) { e.preventDefault(); handleMove(getPointerPos(e)); } }, {passive: false});
+    window.addEventListener('touchend', handleEnd);
+
+    // --- Helper UI ---
+    function updateCursor(pos, isShift) {
+        let cursor = 'default';
+        if (selectedConnection && selectedConnection.lastPath.length > 1) {
+            const path = selectedConnection.lastPath;
+            if (Math.hypot(pos.x - path[0].x, pos.y - path[0].y) <= CONN_HANDLE_SIZE * 1.5 ||
+                Math.hypot(pos.x - path[path.length-1].x, pos.y - path[path.length-1].y) <= CONN_HANDLE_SIZE * 1.5) {
+                cursor = 'pointer';
+                canvas.style.cursor = cursor;
+                return;
+            }
+        }
+        if (selection.length > 0) {
+            const bounds = getSelectionBounds();
+            const handles = getGroupHandles(bounds);
+            const hIdx = handles.findIndex(h => Math.abs(pos.x-h.x)<=HANDLE_SIZE*1.5 && Math.abs(pos.y-h.y)<=HANDLE_SIZE*1.5);
+            if (hIdx !== -1) {
+                cursor = handles[hIdx].cursor;
+                canvas.style.cursor = cursor;
+                return;
+            }
+        }
+        if (isLinking || isBoxSelecting) {
+            cursor = 'crosshair';
+        } else {
+             if (cursor === 'default') {
+                 const s = shapes.find(s => s.contains(pos.x, pos.y));
+                 if (s) cursor = (currentMode === 'link' || isShift) ? 'crosshair' : 'grab';
+             }
+        }
+        canvas.style.cursor = cursor;
+    }
+
+    function setMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        if (mode === 'select') document.getElementById('btn-select').classList.add('active');
+        if (mode === 'link') document.getElementById('btn-link').classList.add('active');
+    }
+
+    function addShape(type) {
+        const s = new Shape(canvas.width/2 + (Math.random()*40-20), canvas.height/2 + (Math.random()*40-20), type);
+        shapes.push(s);
+        selection = [s];
+        currentMode = 'select';
+        setMode('select');
+        updateUI();
+        draw();
+        saveState();
+    }
+
+    function updateUI() {
+        if (selection.length > 0 || selectedConnection) contextTools.classList.remove('hidden');
+        else contextTools.classList.add('hidden');
+    }
+
+    function adjustFontSize(delta, applyToAll) {
+        if (applyToAll) {
+            shapes.forEach(s => s.fontSize = Math.max(12, Math.min(64, s.fontSize + delta)));
+            draw();
+        } else {
+            selection.forEach(s => s.fontSize = Math.max(12, Math.min(64, s.fontSize + delta)));
+            draw();
+        }
+        saveState();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        connections.forEach(c => c.draw(ctx));
+        if (isEditingConnection && selectedConnection) {
+            const startPt = (connDragHandle === 'start') ? connDragMousePos : getPorts(selectedConnection.from).find(p=>p.side === (selectedConnection.fromSide||'bottom')) || {x:selectedConnection.from.x, y:selectedConnection.from.y};
+            const endPt = (connDragHandle === 'end') ? connDragMousePos : getPorts(selectedConnection.to).find(p=>p.side === (selectedConnection.toSide||'top')) || {x:selectedConnection.to.x, y:selectedConnection.to.y};
+            const fixedStart = (connDragHandle === 'end') ? selectedConnection.lastPath[0] : connDragMousePos;
+            const fixedEnd = (connDragHandle === 'start') ? selectedConnection.lastPath[selectedConnection.lastPath.length-1] : connDragMousePos;
+            ctx.beginPath(); ctx.moveTo(fixedStart.x, fixedStart.y); ctx.lineTo(fixedEnd.x, fixedEnd.y); ctx.strokeStyle = '#3b82f6'; ctx.setLineDash([5, 5]); ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+            const hoverShape = shapes.slice().reverse().find(s => s.contains(mousePos.x, mousePos.y));
+            if (hoverShape) {
+                const ports = getPorts(hoverShape);
+                ports.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fillStyle = '#ef4444'; ctx.fill(); });
+            }
+        }
+        if (isLinking && linkStartShape) {
+            ctx.beginPath(); ctx.moveTo(linkStartShape.x, linkStartShape.y); ctx.lineTo(mousePos.x, mousePos.y); ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+        }
+        const nonSelected = shapes.filter(s => !selection.includes(s));
+        nonSelected.forEach(s => s.draw(ctx));
+        selection.forEach(s => s.draw(ctx));
+        if (selectedConnection && !isEditingConnection) {
+            const path = selectedConnection.lastPath;
+            if (path.length > 1) {
+                const start = path[0]; const end = path[path.length - 1];
+                ctx.beginPath(); ctx.arc(start.x, start.y, CONN_HANDLE_SIZE/2, 0, Math.PI * 2); ctx.fillStyle = '#3b82f6'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.beginPath(); ctx.arc(end.x, end.y, CONN_HANDLE_SIZE/2, 0, Math.PI * 2); ctx.fillStyle = '#3b82f6'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            }
+        }
+        if (selection.length > 0) {
+            const b = getSelectionBounds();
+            ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.strokeRect(b.minX, b.minY, b.w, b.h); ctx.setLineDash([]);
+            const handles = getGroupHandles(b);
+            handles.forEach(h => { ctx.beginPath(); ctx.rect(h.x - HANDLE_SIZE/2, h.y - HANDLE_SIZE/2, HANDLE_SIZE, HANDLE_SIZE); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 1.5; ctx.stroke(); });
+        }
+        if (isBoxSelecting) {
+            const w = boxCurrentPos.x - boxStartPos.x; const h = boxCurrentPos.y - boxStartPos.y;
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.1)'; ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1; ctx.setLineDash([4, 2]); ctx.fillRect(boxStartPos.x, boxStartPos.y, w, h); ctx.strokeRect(boxStartPos.x, boxStartPos.y, w, h); ctx.setLineDash([]);
+        }
+    }
+
+    let editingShape = null;
+    canvas.addEventListener('dblclick', e => {
+        const pos = getPointerPos(e);
+        const s = shapes.slice().reverse().find(s => s.contains(pos.x, pos.y));
+        if (s) startEditing(s);
+    });
+
+    function startEditing(shape) {
+        editingShape = shape;
+        textInput.value = shape.text;
+        textInput.style.display = 'block';
+        textInput.style.font = `bold ${shape.fontSize}px "Noto Sans TC"`;
+        const rect = canvas.getBoundingClientRect();
+        const w = Math.max(shape.width, 100);
+        const h = Math.max(shape.height, 50);
+        textInput.style.width = (w + 20) + 'px';
+        textInput.style.height = (h + 20) + 'px';
+        textInput.style.left = (rect.left + shape.x - w/2 - 10) + 'px';
+        textInput.style.top = (rect.top + shape.y - h/2 - 10) + 'px';
+        textInput.style.fontSize = shape.fontSize + 'px';
+        textInput.focus();
+    }
+
+    function finishEditing() {
+        if (editingShape) {
+            editingShape.text = textInput.value;
+            textInput.style.display = 'none';
+            editingShape = null;
+            draw();
+            saveState();
+        }
+    }
+
+    function handleInputKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finishEditing(); }
+    }
+
+    function deleteSelected() {
+        if (selection.length > 0) {
+            connections = connections.filter(c => !selection.includes(c.from) && !selection.includes(c.to));
+            shapes = shapes.filter(s => !selection.includes(s));
+            selection = [];
+        } else if (selectedConnection) {
+            connections = connections.filter(c => c !== selectedConnection);
+            selectedConnection = null;
+        }
+        updateUI();
+        draw();
+        saveState();
+    }
+
+    function clearCanvas() {
+        if (confirm('確定要全部清除嗎？')) {
+            shapes = [];
+            connections = [];
+            selection = [];
+            selectedConnection = null;
+            updateUI();
+            draw();
+            saveState();
+        }
+    }
+
+    function downloadImage() {
+        const link = document.createElement('a');
+        link.download = 'flowchart.png';
+        const tc = document.createElement('canvas');
+        tc.width = canvas.width;
+        tc.height = canvas.height;
+        const tctx = tc.getContext('2d');
+        tctx.fillStyle = '#ffffff';
+        tctx.fillRect(0,0,tc.width,tc.height);
+        tctx.drawImage(canvas, 0,0);
+        link.href = tc.toDataURL();
+        link.click();
+    }
+
+    window.addEventListener('keydown', (e) => {
+        const isEditing = textInput.style.display === 'block';
+        if ((e.key === 'Delete' || e.key === 'Backspace') && !isEditing) deleteSelected();
+    });
+</script>
+</body>
+</html>

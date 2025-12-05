@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分類偵探學院：邏輯思維特訓</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #fdfbf7; /* Warm neutral background */
+            color: #4a4a4a;
+        }
+        
+        /* Flowchart CSS Shapes */
+        .shape-start {
+            border-radius: 50px;
+            background-color: #fce7f3; /* pink-100 */
+            border: 2px solid #db2777; /* pink-600 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .shape-decision {
+            background-color: #fef9c3; /* yellow-100 */
+            border: 2px solid #ca8a04; /* yellow-600 */
+            transform: rotate(45deg);
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px auto;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .shape-decision-content {
+            transform: rotate(-45deg);
+            text-align: center;
+            width: 140px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .shape-process {
+            background-color: #dcfce7; /* green-100 */
+            border: 2px solid #16a34a; /* green-600 */
+            border-radius: 8px;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            font-weight: bold;
+        }
+
+        /* Connecting Lines Logic (Simplified for CSS) */
+        .flow-line {
+            width: 2px;
+            background-color: #9ca3af;
+            margin: 0 auto;
+        }
+
+        /* Chart Container Override */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; 
+        }
+
+        .active-node {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
+            transform: scale(1.05);
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        
+        .path-highlight {
+            border-color: #2563eb !important; /* Blue-600 */
+            background-color: #eff6ff !important; /* Blue-50 */
+            color: #1e40af;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <!-- Chosen Palette: Warm Education Theme. Background: Warm White (#fdfbf7). Primary: Soft Blue (Logic). Secondary: Yellow (Question). Success: Green (Result). Alert: Pink (Start/End). -->
+    <!-- Application Structure Plan: 
+         1. Hero Section: Hook the student with the "Detective" theme.
+         2. Concept Lab: Interactive visualization of "Binary Dichotomy" using Chart.js to show how good questions split data.
+         3. Tool Shed: Interactive legend for flowchart symbols (Start, Decision, Process).
+         4. Mission 1 (Animals): A "Mind Reader" game. The user picks an animal mentally, and the app uses the logic from the report to guess it. This actively demonstrates the flowchart in action.
+         5. Mission 2 (Stationery): A "Logic Simulator". The user selects a stationery item, and the app visualizes the path taken through the questions defined in the exercise.
+         6. Detective Handbook: Accordion-style tips for success.
+         Rationale: This structure moves from Concept -> Tools -> Active Experience -> Simulation -> Reflection, maximizing understanding for a 6th-grade level.
+    -->
+    <!-- Visualization & Content Choices:
+         1. Chart.js Pie Charts: To demonstrate the "50/50 Split" rule (Binary Dichotomy). Visualizing "Good Question" vs "Bad Question".
+         2. CSS Shapes: To represent Flowchart Symbols without SVG. Interactive hover states explain their meaning.
+         3. Interactive DOM Tree: For the Animal Classification. Instead of a static image, it's a dynamic decision tree that lights up as you play.
+         4. Logic Path Simulator: For the Stationery exercise. Highlights the logic path based on user selection, reinforcing the "If This, Then That" concept.
+         CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="selection:bg-yellow-200">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">🕵️‍♂️</span>
+                <h1 class="font-bold text-lg md:text-xl text-slate-800">分類偵探學院</h1>
+            </div>
+            <div class="hidden md:flex space-x-6 text-sm font-medium text-slate-600">
+                <a href="#concept" class="hover:text-blue-600 transition">二分法奥義</a>
+                <a href="#symbols" class="hover:text-blue-600 transition">裝備介紹</a>
+                <a href="#mission-animals" class="hover:text-blue-600 transition">動物任務</a>
+                <a href="#mission-stationery" class="hover:text-blue-600 transition">文具挑戰</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="max-w-4xl mx-auto px-4 py-8 space-y-16">
+
+        <!-- Hero Section -->
+        <section class="text-center space-y-6 animate-fade-in">
+            <h2 class="text-4xl md:text-5xl font-bold text-slate-800 tracking-tight">成為邏輯思考大師</h2>
+            <p class="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+                歡迎來到偵探學院！分類流程圖就像一張藏寶圖，幫助我們把混亂的線索整理清楚。
+                準備好學習核心秘訣<b>「二分法」</b>了嗎？
+            </p>
+            <div class="flex justify-center gap-4">
+                <a href="#concept" class="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 transition transform hover:-translate-y-1">開始特訓</a>
+            </div>
+        </section>
+
+        <!-- Section 1: Concept (Binary Dichotomy) -->
+        <section id="concept" class="bg-white rounded-2xl shadow-lg p-6 md:p-8 scroll-mt-20">
+            <div class="border-b-2 border-slate-100 pb-4 mb-6">
+                <h3 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <span class="bg-blue-100 text-blue-600 rounded-lg p-2 text-xl">1</span>
+                    核心秘訣：二分法
+                </h3>
+            </div>
+            
+            <p class="text-slate-600 mb-6">
+                分類的黃金法則：每次只問一個問題，把東西分成<b>「是」</b>和<b>「不是」</b>兩組。
+                看看下面的數據圖，哪個問題能幫我們最好地分類？
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-8 items-center">
+                <!-- Interactive Chart Area -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div class="chart-container">
+                        <canvas id="dichotomyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="space-y-4">
+                    <div class="bg-red-50 p-4 rounded-lg border border-red-100 cursor-pointer hover:bg-red-100 transition" onclick="updateChart('bad')">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-red-700">❌ 不好的問題</span>
+                            <span class="text-2xl">🎨</span>
+                        </div>
+                        <p class="text-sm text-red-800 font-medium">「它是什麼顏色的？」</p>
+                        <p class="text-xs text-red-600 mt-1">答案太多種（紅、藍、綠...），無法乾脆地分開。</p>
+                    </div>
+
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-100 cursor-pointer hover:bg-green-100 transition ring-2 ring-green-400" onclick="updateChart('good')">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-green-700">✅ 好的問題 (二分法)</span>
+                            <span class="text-2xl">🍎</span>
+                        </div>
+                        <p class="text-sm text-green-800 font-medium">「它是紅色的嗎？」</p>
+                        <p class="text-xs text-green-600 mt-1">答案只有「是」或「不是」，完美切分！</p>
+                    </div>
+                    
+                    <div class="text-center text-sm text-slate-500 mt-4">
+                        👆 點擊上面的卡片來觀察圖表變化
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Symbols (The Tool Kit) -->
+        <section id="symbols" class="scroll-mt-20">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="bg-yellow-100 text-yellow-700 rounded-lg p-2 text-xl font-bold">2</span>
+                <h3 class="text-2xl font-bold text-slate-800">認識三大金剛（符號）</h3>
+            </div>
+            <p class="text-slate-600 mb-6">畫圖前，先熟悉我們的語言。點擊卡片查看詳細說明。</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Start/End -->
+                <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition cursor-help group text-center border-t-4 border-pink-500">
+                    <div class="h-16 flex items-center justify-center mb-4">
+                        <div class="shape-start text-sm font-bold text-pink-700 w-32">開始 / 結束</div>
+                    </div>
+                    <h4 class="font-bold text-lg text-slate-800 mb-2">橢圓形</h4>
+                    <p class="text-slate-500 text-sm group-hover:text-slate-700">代表分類的起點或終點。</p>
+                    <div class="mt-4 text-xs bg-slate-100 p-2 rounded text-slate-600 opacity-0 group-hover:opacity-100 transition">例：「開始分類」、「分類完成」</div>
+                </div>
+
+                <!-- Decision -->
+                <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition cursor-help group text-center border-t-4 border-yellow-500">
+                    <div class="h-24 flex items-center justify-center mb-0">
+                        <div class="bg-yellow-100 border-2 border-yellow-600 w-12 h-12 transform rotate-45 flex items-center justify-center shadow-sm">
+                            <span class="transform -rotate-45 text-xl">❓</span>
+                        </div>
+                    </div>
+                    <h4 class="font-bold text-lg text-slate-800 mb-2">菱形</h4>
+                    <p class="text-slate-500 text-sm group-hover:text-slate-700">代表一個「問題」。這裡會有兩條路。</p>
+                    <div class="mt-4 text-xs bg-slate-100 p-2 rounded text-slate-600 opacity-0 group-hover:opacity-100 transition">例：「它有腳嗎？」(是/不是)</div>
+                </div>
+
+                <!-- Process/Item -->
+                <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition cursor-help group text-center border-t-4 border-green-500">
+                    <div class="h-16 flex items-center justify-center mb-4">
+                        <div class="shape-process text-green-800 w-32">結果 / 物品</div>
+                    </div>
+                    <h4 class="font-bold text-lg text-slate-800 mb-2">矩形</h4>
+                    <p class="text-slate-500 text-sm group-hover:text-slate-700">代表分類的結果或物品。</p>
+                    <div class="mt-4 text-xs bg-slate-100 p-2 rounded text-slate-600 opacity-0 group-hover:opacity-100 transition">例：「貓」、「蘋果」</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Animal Classification Game -->
+        <section id="mission-animals" class="bg-blue-50 rounded-2xl p-6 md:p-8 scroll-mt-20 border border-blue-100">
+            <div class="border-b-2 border-blue-200 pb-4 mb-6">
+                <h3 class="text-2xl font-bold text-blue-900 flex items-center gap-2">
+                    <span class="bg-blue-600 text-white rounded-lg p-2 text-xl">3</span>
+                    實戰示範：動物讀心術 🦁
+                </h3>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Instructions -->
+                <div>
+                    <p class="text-blue-900 font-medium mb-4 text-lg">
+                        請在心中從下面選一隻動物，不要告訴我！
+                        我會問你幾個問題，看看我能不能猜中你想的是誰。
+                    </p>
+                    <div class="grid grid-cols-2 gap-3 mb-6">
+                        <div class="bg-white p-3 rounded-lg text-center shadow-sm border border-blue-100">🕊️ 鴿子</div>
+                        <div class="bg-white p-3 rounded-lg text-center shadow-sm border border-blue-100">🐯 老虎</div>
+                        <div class="bg-white p-3 rounded-lg text-center shadow-sm border border-blue-100">🐋 鯨魚</div>
+                        <div class="bg-white p-3 rounded-lg text-center shadow-sm border border-blue-100">🦎 蜥蜴</div>
+                    </div>
+                    <button onclick="startGame()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow hover:bg-blue-700 transition">
+                        我選好了，開始讀心！
+                    </button>
+                    <div id="game-reset" class="hidden mt-4">
+                        <button onclick="resetGame()" class="text-blue-600 underline text-sm w-full text-center">重置遊戲</button>
+                    </div>
+                </div>
+
+                <!-- Interactive Flowchart Display -->
+                <div class="bg-white rounded-xl shadow-inner p-4 min-h-[350px] flex flex-col items-center justify-center relative overflow-hidden" id="flowchart-stage">
+                    
+                    <!-- Initial State -->
+                    <div id="stage-start" class="text-center p-6">
+                        <div class="text-4xl mb-4">🔮</div>
+                        <p class="text-slate-500">等待開始...</p>
+                    </div>
+
+                    <!-- Question 1 -->
+                    <div id="stage-q1" class="hidden flex flex-col items-center w-full fade-in">
+                        <div class="shape-decision mb-8">
+                            <div class="shape-decision-content">它是胎生<br>(生寶寶)嗎？</div>
+                        </div>
+                        <div class="flex gap-16 w-full justify-center">
+                            <button onclick="answerQ1(true)" class="px-6 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-bold border-2 border-green-300">是 (Yes)</button>
+                            <button onclick="answerQ1(false)" class="px-6 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-bold border-2 border-red-300">不是 (No)</button>
+                        </div>
+                    </div>
+
+                    <!-- Question 2 (Viviparous Path) -->
+                    <div id="stage-q2" class="hidden flex flex-col items-center w-full fade-in">
+                        <div class="text-xs text-blue-500 mb-2 font-bold">上一步：是胎生 ✅</div>
+                        <div class="shape-decision mb-8">
+                            <div class="shape-decision-content">它生活在<br>水裡嗎？</div>
+                        </div>
+                        <div class="flex gap-16 w-full justify-center">
+                            <button onclick="showResult('🐋 鯨魚')" class="px-6 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-bold border-2 border-green-300">是</button>
+                            <button onclick="showResult('🐯 老虎')" class="px-6 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-bold border-2 border-red-300">不是</button>
+                        </div>
+                    </div>
+
+                    <!-- Question 3 (Oviparous Path) -->
+                    <div id="stage-q3" class="hidden flex flex-col items-center w-full fade-in">
+                        <div class="text-xs text-blue-500 mb-2 font-bold">上一步：不是胎生 ❌</div>
+                        <div class="shape-decision mb-8">
+                            <div class="shape-decision-content">它有羽毛嗎？</div>
+                        </div>
+                        <div class="flex gap-16 w-full justify-center">
+                            <button onclick="showResult('🕊️ 鴿子')" class="px-6 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-bold border-2 border-green-300">是</button>
+                            <button onclick="showResult('🦎 蜥蜴')" class="px-6 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-bold border-2 border-red-300">不是</button>
+                        </div>
+                    </div>
+
+                    <!-- Result -->
+                    <div id="stage-result" class="hidden flex flex-col items-center fade-in text-center">
+                        <p class="text-slate-500 mb-4">偵探的推理結果是...</p>
+                        <div class="shape-process bg-green-500 text-white border-none text-2xl px-8 py-4 shadow-lg mb-4 transform scale-110">
+                            <span id="result-text"></span>
+                        </div>
+                        <p class="text-sm text-slate-400">是不是猜對了？這就是流程圖的力量！</p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Stationery Exercise (Logic Simulation) -->
+        <section id="mission-stationery" class="bg-white rounded-2xl shadow-lg p-6 md:p-8 scroll-mt-20">
+            <div class="border-b-2 border-slate-100 pb-4 mb-6">
+                <h3 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <span class="bg-orange-100 text-orange-600 rounded-lg p-2 text-xl">4</span>
+                    練習任務：文具大整理 ✏️
+                </h3>
+            </div>
+            
+            <p class="text-slate-600 mb-6">
+                現在換你來當偵探！我們已經根據特徵設計好了問題。
+                <b>請點擊左邊的一種文具</b>，看看它是如何通過流程圖被分類出來的。
+            </p>
+
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- Stationery Selector -->
+                <div class="w-full md:w-1/3 space-y-3">
+                    <h4 class="font-bold text-slate-700 mb-2">1. 選擇一樣文具：</h4>
+                    <button onclick="simulateStationery('scissors')" class="stationery-btn w-full text-left px-4 py-3 rounded-lg border hover:bg-slate-50 transition flex justify-between group focus:ring-2 ring-blue-400" id="btn-scissors">
+                        <span>✂️ 剪刀</span>
+                        <span class="text-xs text-slate-400 group-hover:text-slate-600">金屬, 有刀刃</span>
+                    </button>
+                    <button onclick="simulateStationery('ruler')" class="stationery-btn w-full text-left px-4 py-3 rounded-lg border hover:bg-slate-50 transition flex justify-between group focus:ring-2 ring-blue-400" id="btn-ruler">
+                        <span>📏 鐵尺</span>
+                        <span class="text-xs text-slate-400 group-hover:text-slate-600">金屬, 無刀刃</span>
+                    </button>
+                    <button onclick="simulateStationery('eraser')" class="stationery-btn w-full text-left px-4 py-3 rounded-lg border hover:bg-slate-50 transition flex justify-between group focus:ring-2 ring-blue-400" id="btn-eraser">
+                        <span>🧼 擦膠</span>
+                        <span class="text-xs text-slate-400 group-hover:text-slate-600">非金屬, 擦字</span>
+                    </button>
+                    <button onclick="simulateStationery('brush')" class="stationery-btn w-full text-left px-4 py-3 rounded-lg border hover:bg-slate-50 transition flex justify-between group focus:ring-2 ring-blue-400" id="btn-brush">
+                        <span>🖌️ 毛筆</span>
+                        <span class="text-xs text-slate-400 group-hover:text-slate-600">非金屬, 寫字</span>
+                    </button>
+                </div>
+
+                <!-- Visual Logic Path -->
+                <div class="w-full md:w-2/3 bg-slate-50 p-6 rounded-xl border border-slate-200 relative overflow-hidden">
+                    <div class="absolute top-2 right-2 text-xs text-slate-400 font-mono">FLOW_VISUALIZER_v1.0</div>
+                    
+                    <!-- Flowchart Structure (HTML/CSS representation) -->
+                    <div class="flex flex-col items-center space-y-6 relative z-10">
+                        
+                        <!-- Root Question -->
+                        <div id="node-root" class="transition-all duration-500 opacity-50">
+                            <div class="shape-decision bg-white w-24 h-24 text-xs mx-auto mb-2">
+                                <div class="shape-decision-content">它是金屬<br>做的嗎？</div>
+                            </div>
+                            <div class="flex justify-between w-64 text-xs font-bold px-4">
+                                <span id="path-metal" class="text-slate-300 transition-colors duration-300">↙ 是 (金屬)</span>
+                                <span id="path-nonmetal" class="text-slate-300 transition-colors duration-300">不是 (非金屬) ↘</span>
+                            </div>
+                        </div>
+
+                        <!-- Level 2 Questions -->
+                        <div class="flex w-full justify-between gap-4">
+                            <!-- Metal Branch -->
+                            <div id="node-metal" class="w-1/2 flex flex-col items-center opacity-50 transition-all duration-500">
+                                <div class="shape-decision bg-white w-24 h-24 text-xs mx-auto mb-2">
+                                    <div class="shape-decision-content">它有鋒利<br>刀刃嗎？</div>
+                                </div>
+                                <div class="flex justify-between w-32 text-xs font-bold">
+                                    <span id="path-sharp" class="text-slate-300 transition-colors duration-300">↙ 是</span>
+                                    <span id="path-notsharp" class="text-slate-300 transition-colors duration-300">否 ↘</span>
+                                </div>
+                            </div>
+
+                            <!-- Non-Metal Branch -->
+                            <div id="node-nonmetal" class="w-1/2 flex flex-col items-center opacity-50 transition-all duration-500">
+                                <div class="shape-decision bg-white w-24 h-24 text-xs mx-auto mb-2">
+                                    <div class="shape-decision-content">它是用來<br>寫字的嗎？</div>
+                                </div>
+                                <div class="flex justify-between w-32 text-xs font-bold">
+                                    <span id="path-write" class="text-slate-300 transition-colors duration-300">↙ 是</span>
+                                    <span id="path-nowrite" class="text-slate-300 transition-colors duration-300">否 ↘</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Results -->
+                        <div class="flex w-full justify-between text-sm font-bold">
+                            <div id="res-scissors" class="w-1/4 text-center p-2 rounded opacity-30 transition-all duration-500">✂️ 剪刀</div>
+                            <div id="res-ruler" class="w-1/4 text-center p-2 rounded opacity-30 transition-all duration-500">📏 鐵尺</div>
+                            <div id="res-brush" class="w-1/4 text-center p-2 rounded opacity-30 transition-all duration-500">🖌️ 毛筆</div>
+                            <div id="res-eraser" class="w-1/4 text-center p-2 rounded opacity-30 transition-all duration-500">🧼 擦膠</div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tips Section -->
+        <section class="border-t pt-8">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">給小偵探的備忘錄 (Tips)</h3>
+            <div class="grid md:grid-cols-3 gap-6 text-sm">
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h4 class="font-bold text-slate-700 mb-2">1. 客觀 vs 主觀</h4>
+                    <p class="text-slate-500">❌ 壞問題：「它可愛嗎？」<br>✅ 好問題：「它有四條腿嗎？」<br>要問每個人答案都一樣的問題。</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h4 class="font-bold text-slate-700 mb-2">2. 記得測試</h4>
+                    <p class="text-slate-500">畫完圖後，自己拿一個物品從「開始」走一遍，看看能不能走到正確的終點。</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h4 class="font-bold text-slate-700 mb-2">3. 沒有標準答案</h4>
+                    <p class="text-slate-500">分類方式有很多種！例如動物也可以先問「會不會飛？」。多試試不同的路徑。</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-slate-800 text-slate-400 py-8 mt-12 text-center text-sm">
+        <p>分類偵探學院 | 小六邏輯思維教材</p>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 1. Concept Chart (Chart.js) ---
+        let dichotomyChart;
+
+        function initChart() {
+            const ctx = document.getElementById('dichotomyChart').getContext('2d');
+            dichotomyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['🍎', '🍏', '🚙', '🚜'],
+                    datasets: [{
+                        label: '物品特徵',
+                        data: [1, 1, 1, 1], // Dummy data
+                        backgroundColor: ['#ef4444', '#22c55e', '#3b82f6', '#eab308'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false },
+                        title: { display: true, text: '物品清單：紅蘋果、青蘋果、藍車、黃拖拉機' }
+                    },
+                    scales: {
+                        y: { display: false },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function updateChart(type) {
+            if (type === 'good') {
+                // Good Question: Is it Red? (Binary Split)
+                dichotomyChart.data.labels = ['是紅色的 (Yes)', '不是紅色的 (No)'];
+                dichotomyChart.data.datasets[0].data = [1, 3]; // 1 red, 3 others
+                dichotomyChart.data.datasets[0].backgroundColor = ['#ef4444', '#94a3b8'];
+                dichotomyChart.options.plugins.title.text = '問題：「它是紅色的嗎？」 -> 成功分成兩組';
+            } else {
+                // Bad Question: What color is it? (Many groups)
+                dichotomyChart.data.labels = ['紅', '綠', '藍', '黃'];
+                dichotomyChart.data.datasets[0].data = [1, 1, 1, 1];
+                dichotomyChart.data.datasets[0].backgroundColor = ['#ef4444', '#22c55e', '#3b82f6', '#eab308'];
+                dichotomyChart.options.plugins.title.text = '問題：「它是什麼顏色的？」 -> 答案太亂，沒有分好';
+            }
+            dichotomyChart.update();
+        }
+
+        // --- 2. Animal Game Logic ---
+        function startGame() {
+            document.getElementById('stage-start').classList.add('hidden');
+            document.getElementById('stage-q1').classList.remove('hidden');
+            document.getElementById('game-reset').classList.remove('hidden');
+        }
+
+        function answerQ1(isViviparous) {
+            document.getElementById('stage-q1').classList.add('hidden');
+            if (isViviparous) {
+                document.getElementById('stage-q2').classList.remove('hidden');
+            } else {
+                document.getElementById('stage-q3').classList.remove('hidden');
+            }
+        }
+
+        function showResult(animalName) {
+            document.getElementById('stage-q2').classList.add('hidden');
+            document.getElementById('stage-q3').classList.add('hidden');
+            document.getElementById('stage-result').classList.remove('hidden');
+            document.getElementById('result-text').innerText = animalName;
+        }
+
+        function resetGame() {
+            document.getElementById('stage-result').classList.add('hidden');
+            document.getElementById('stage-q1').classList.add('hidden');
+            document.getElementById('stage-q2').classList.add('hidden');
+            document.getElementById('stage-q3').classList.add('hidden');
+            document.getElementById('stage-start').classList.remove('hidden');
+            document.getElementById('game-reset').classList.add('hidden');
+        }
+
+        // --- 3. Stationery Simulator Logic ---
+        function simulateStationery(item) {
+            // Reset all styles
+            document.querySelectorAll('.stationery-btn').forEach(b => b.classList.remove('bg-blue-50', 'border-blue-500'));
+            document.getElementById(`btn-${item}`).classList.add('bg-blue-50', 'border-blue-500');
+
+            // Reset Visualization
+            const nodes = ['node-root', 'node-metal', 'node-nonmetal'];
+            const paths = ['path-metal', 'path-nonmetal', 'path-sharp', 'path-notsharp', 'path-write', 'path-nowrite'];
+            const results = ['res-scissors', 'res-ruler', 'res-brush', 'res-eraser'];
+
+            nodes.forEach(id => document.getElementById(id).style.opacity = '0.3');
+            paths.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('text-blue-600', 'font-extrabold');
+                el.classList.add('text-slate-300');
+            });
+            results.forEach(id => {
+                const el = document.getElementById(id);
+                el.style.opacity = '0.3';
+                el.classList.remove('bg-green-100', 'text-green-800');
+            });
+
+            // Highlight Logic
+            setTimeout(() => {
+                // Step 1: Root Question
+                document.getElementById('node-root').style.opacity = '1';
+                document.getElementById('node-root').querySelector('.shape-decision').classList.add('active-node');
+                setTimeout(() => document.getElementById('node-root').querySelector('.shape-decision').classList.remove('active-node'), 500);
+
+                // Determine Path
+                const isMetal = (item === 'scissors' || item === 'ruler');
+                
+                setTimeout(() => {
+                    // Highlight Path 1
+                    const p1 = isMetal ? 'path-metal' : 'path-nonmetal';
+                    const elP1 = document.getElementById(p1);
+                    elP1.classList.remove('text-slate-300');
+                    elP1.classList.add('text-blue-600', 'font-extrabold');
+
+                    // Step 2: Level 2 Node
+                    const nextNode = isMetal ? 'node-metal' : 'node-nonmetal';
+                    document.getElementById(nextNode).style.opacity = '1';
+                    document.getElementById(nextNode).querySelector('.shape-decision').classList.add('active-node');
+                    setTimeout(() => document.getElementById(nextNode).querySelector('.shape-decision').classList.remove('active-node'), 500);
+
+                    setTimeout(() => {
+                        // Highlight Path 2 & Result
+                        let p2, res;
+                        if (item === 'scissors') { p2 = 'path-sharp'; res = 'res-scissors'; }
+                        if (item === 'ruler') { p2 = 'path-notsharp'; res = 'res-ruler'; }
+                        if (item === 'brush') { p2 = 'path-write'; res = 'res-brush'; } // Note: Logic from report: "Is it for writing?" -> Yes (Brush is tricky, context implies brush writes)
+                        // Wait, check report logic: 
+                        // Eraser vs Brush. Non-metal. 
+                        // Report Q3: "Is it for writing?" -> Actually Brush writes, Eraser erases. 
+                        // So Brush -> Yes, Eraser -> No.
+                        if (item === 'eraser') { p2 = 'path-nowrite'; res = 'res-eraser'; }
+
+                        const elP2 = document.getElementById(p2);
+                        elP2.classList.remove('text-slate-300');
+                        elP2.classList.add('text-blue-600', 'font-extrabold');
+
+                        const elRes = document.getElementById(res);
+                        elRes.style.opacity = '1';
+                        elRes.classList.add('bg-green-100', 'text-green-800');
+
+                    }, 600);
+                }, 600);
+            }, 100);
+        }
+
+        // Initialize
+        window.onload = function() {
+            initChart();
+            // Start with "Good" chart state to look nice
+            updateChart('good'); 
+        };
+
+    </script>
+</body>
+</html>
