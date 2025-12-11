@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專業棒形圖產生器 v6.0 (智慧格線版)</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 引入 html2canvas 用於完美截圖 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 引入 Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f3f4f6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        .vertical-text-span {
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            letter-spacing: 0.2rem;
+            white-space: nowrap;
+        }
+        .transition-all-300 {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-indigo-600 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">📊 棒形圖產生器 v6.0</h1>
+                <p class="text-indigo-100 text-sm mt-1">自動儲存 • 複合圖表 • 智慧格線</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- 左側：控制面板與數據輸入 -->
+            <div class="lg:col-span-5 space-y-6">
+                
+                <!-- 1. 圖表設定 -->
+                <div class="glass-panel rounded-xl shadow-sm p-6 bg-white relative">
+                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded mr-2">⚙️</span> 
+                            圖表設定
+                        </h2>
+                        <div class="flex items-center space-x-3">
+                            <span id="saveStatus" class="text-xs text-gray-400 flex items-center opacity-0 transition-opacity duration-500">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                已自動儲存
+                            </span>
+                            <button onclick="resetSettings()" class="text-xs text-gray-500 hover:text-indigo-600 border border-gray-300 hover:border-indigo-600 px-2 py-1 rounded transition-colors">
+                                ↺ 重設設定
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">圖表類型</label>
+                            <select id="chartType" class="w-full rounded-md border-indigo-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 text-sm bg-indigo-50 font-bold text-indigo-900">
+                                <option value="simple">單一棒形圖 (Simple)</option>
+                                <option value="grouped">兩棒並排 (Grouped)</option>
+                                <option value="stacked">兩棒連接 (Stacked)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">圖表標題</label>
+                            <input type="text" id="chartTitle" value="小泰的各科成績" onfocus="this.select()" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 text-sm">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">橫軸標題 (X軸)</label>
+                                <input type="text" id="xAxisLabel" value="科目" onfocus="this.select()" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">縱軸標題 (Y軸)</label>
+                                <input type="text" id="yAxisLabel" value="分數" onfocus="this.select()" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 text-sm">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">圖表方向</label>
+                                <div class="flex flex-col space-y-2">
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="orientation" value="bar" checked class="form-radio text-indigo-600 focus:ring-indigo-500">
+                                        <span class="ml-2 text-sm">直向 (Vertical)</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="orientation" value="horizontal" class="form-radio text-indigo-600 focus:ring-indigo-500">
+                                        <span class="ml-2 text-sm">橫向 (Horizontal)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">格線顯示</label>
+                                    <select id="gridSettings" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 text-sm bg-white">
+                                        <option value="full">完整格線 (Full)</option>
+                                        <option value="horizontal" selected>只有橫線 (Horizontal Only)</option>
+                                        <!-- 新增：只有直線 -->
+                                        <option value="vertical">只有直線 (Vertical Only)</option>
+                                        <option value="none">不顯示 (None)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">四捨五入位值</label>
+                                    <select id="roundingBase" onchange="applyGlobalRounding()" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 text-sm bg-white">
+                                        <option value="1" selected>個位 (預設)</option>
+                                        <option value="10">十位</option>
+                                        <option value="100">百位</option>
+                                        <option value="1000">千位</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 設定區塊 A: 棒形顏色設定 -->
+                        <div id="simpleColorConfig" class="border-t pt-4 mt-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">棒形顏色設定</label>
+                            <div class="flex flex-col space-y-2">
+                                <label class="inline-flex items-center">
+                                    <input type="radio" name="colorMode" value="multi" checked class="form-radio text-indigo-600 focus:ring-indigo-500">
+                                    <span class="ml-2 text-sm">不同顏色 (預設)</span>
+                                </label>
+                                <div class="flex items-center justify-between">
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="colorMode" value="single" class="form-radio text-indigo-600 focus:ring-indigo-500">
+                                        <span class="ml-2 text-sm">全部同色</span>
+                                    </label>
+                                    <input type="color" id="barSingleColor" value="#4F46E5" class="h-8 w-16 p-1 rounded border border-gray-300 cursor-pointer disabled:opacity-50" disabled>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 設定區塊 B: 數據系列設定 -->
+                        <div id="complexSeriesSettings" class="border-t pt-4 mt-2 hidden">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">數據系列設定 (圖例)</label>
+                            <div class="flex items-center space-x-2 mb-2">
+                                <input type="color" id="color1" value="#4F46E5" class="h-8 w-12 p-0 rounded border border-gray-300 cursor-pointer">
+                                <input type="text" id="label1" value="數據 A" class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-1.5 text-sm" placeholder="系列 1 名稱">
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <input type="color" id="color2" value="#EC4899" class="h-8 w-12 p-0 rounded border border-gray-300 cursor-pointer">
+                                <input type="text" id="label2" value="數據 B" class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-1.5 text-sm" placeholder="系列 2 名稱">
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- 2. 數據輸入 -->
+                <div class="glass-panel rounded-xl shadow-sm p-6 bg-white relative">
+                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="bg-emerald-100 text-emerald-600 p-1.5 rounded mr-2">📝</span> 
+                            數據輸入
+                        </h2>
+                        <div class="flex items-center space-x-2">
+                            <span id="countDisplay" class="text-xs font-medium px-2 py-1 rounded bg-gray-100 text-gray-600">3 / 10 項目</span>
+                            <button onclick="clearItems()" class="text-xs text-gray-500 hover:text-orange-600 border border-gray-300 hover:border-orange-600 px-2 py-1 rounded transition-colors" title="只清除項目名稱">
+                                ↺ 清除項目
+                            </button>
+                            <button onclick="clearValues()" class="text-xs text-gray-500 hover:text-emerald-600 border border-gray-300 hover:border-emerald-600 px-2 py-1 rounded transition-colors" title="只清除數值">
+                                ↺ 清除數值
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">項目名稱</th>
+                                    <th scope="col" id="colHeaderVal1" class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider header-val1 w-1/4">數值</th>
+                                    <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider header-val2 hidden w-1/4">數值 2</th>
+                                    <th scope="col" class="relative px-2 py-2 w-10">
+                                        <span class="sr-only">刪除</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- JS 將會動態填充這裡 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <p id="roundingMsg" class="text-[10px] text-gray-500 text-right mt-1 hidden">(數值已自動四捨五入)</p>
+
+                    <button id="addRowBtn" class="mt-4 w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        <svg class="-ml-1 mr-2 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                        新增項目
+                    </button>
+                    <p id="maxLimitMsg" class="hidden text-xs text-red-500 text-center mt-2">已達到上限 (10個項目)</p>
+                </div>
+            </div>
+
+            <!-- 右側：預覽與匯出 -->
+            <div class="lg:col-span-7 space-y-6">
+                <div class="glass-panel rounded-xl shadow-lg p-6 bg-white min-h-[600px] flex flex-col">
+                    <div class="flex justify-between items-center mb-6 flex-shrink-0">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="bg-blue-100 text-blue-600 p-1.5 rounded mr-2">📊</span> 
+                            圖表預覽
+                        </h2>
+                        <button onclick="downloadChart()" id="downloadBtn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                            匯出圖片 (PNG)
+                        </button>
+                    </div>
+
+                    <div class="relative flex-1 w-full bg-white rounded-lg p-4 border border-gray-100 flex flex-row items-stretch overflow-hidden" id="chartExportArea">
+                        <div class="flex-shrink-0 flex justify-center items-center px-2">
+                            <span id="htmlYAxisTitle" class="vertical-text-span font-bold text-gray-600 text-lg select-none">分數</span>
+                        </div>
+                        <div class="relative flex-1 min-w-0">
+                            <canvas id="myChart"></canvas>
+                        </div>
+                    </div>
+                    <p class="text-center text-xs text-gray-400 mt-4 flex-shrink-0">提示：您可以右鍵點擊圖片進行複製，或使用上方按鈕下載。</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white border-t border-gray-200 mt-auto"></footer>
+
+    <script>
+        const STORAGE_KEY = 'chart_generator_v5_data';
+        const MAX_ITEMS = 10;
+        const DEFAULT_DATA = [
+            { label: '中文', value1: 85, value2: 70 },
+            { label: '英文', value1: 92, value2: 88 },
+            { label: '數學', value1: 78, value2: 95 }
+        ];
+        
+        const DEFAULT_COLORS = [
+            'rgb(79, 70, 229)', 'rgb(16, 185, 129)', 'rgb(245, 158, 11)',
+            'rgb(239, 68, 68)', 'rgb(59, 130, 246)', 'rgb(139, 92, 246)', 'rgb(236, 72, 153)',
+            'rgb(14, 165, 233)', 'rgb(168, 85, 247)', 'rgb(236, 72, 153)' 
+        ];
+        
+        let chartData = JSON.parse(JSON.stringify(DEFAULT_DATA)); 
+        let chartInstance = null;
+        let saveTimeout; 
+
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const dataTableBody = document.getElementById('dataTableBody');
+        const addRowBtn = document.getElementById('addRowBtn');
+        const maxLimitMsg = document.getElementById('maxLimitMsg');
+        const countDisplay = document.getElementById('countDisplay');
+        const colHeaderVal1 = document.getElementById('colHeaderVal1');
+        const htmlYAxisTitle = document.getElementById('htmlYAxisTitle'); 
+        const downloadBtn = document.getElementById('downloadBtn');
+        const roundingMsg = document.getElementById('roundingMsg');
+        const saveStatus = document.getElementById('saveStatus');
+        
+        const inputs = {
+            chartType: document.getElementById('chartType'),
+            title: document.getElementById('chartTitle'),
+            xLabel: document.getElementById('xAxisLabel'),
+            yLabel: document.getElementById('yAxisLabel'),
+            radios: document.getElementsByName('orientation'),
+            gridSettings: document.getElementById('gridSettings'),
+            roundingBase: document.getElementById('roundingBase'),
+            simpleColorConfig: document.getElementById('simpleColorConfig'),
+            complexSeriesSettings: document.getElementById('complexSeriesSettings'),
+            colorModeRadios: document.getElementsByName('colorMode'),
+            singleColorInput: document.getElementById('barSingleColor'),
+            label1: document.getElementById('label1'),
+            color1: document.getElementById('color1'),
+            label2: document.getElementById('label2'),
+            color2: document.getElementById('color2')
+        };
+
+        function init() {
+            if (loadData()) {
+                // 數據已載入
+            } else {
+                renderTable();
+            }
+            updateInterfaceMode();
+            createChart();
+            setupEventListeners();
+        }
+
+        function saveData() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                const state = {
+                    chartData: chartData,
+                    config: {
+                        chartType: inputs.chartType.value,
+                        title: inputs.title.value,
+                        xLabel: inputs.xLabel.value,
+                        yLabel: inputs.yLabel.value,
+                        orientation: document.querySelector('input[name="orientation"]:checked').value,
+                        gridSettings: inputs.gridSettings.value,
+                        roundingBase: inputs.roundingBase.value,
+                        colorMode: document.querySelector('input[name="colorMode"]:checked').value,
+                        singleColor: inputs.singleColorInput.value,
+                        label1: inputs.label1.value,
+                        color1: inputs.color1.value,
+                        label2: inputs.label2.value,
+                        color2: inputs.color2.value
+                    }
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                saveStatus.style.opacity = '1';
+                setTimeout(() => {
+                    saveStatus.style.opacity = '0';
+                }, 2000);
+            }, 500); 
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return false;
+
+            try {
+                const state = JSON.parse(saved);
+                chartData = state.chartData || JSON.parse(JSON.stringify(DEFAULT_DATA));
+                
+                if (state.config) {
+                    inputs.chartType.value = state.config.chartType || 'simple';
+                    inputs.title.value = state.config.title || '';
+                    inputs.xLabel.value = state.config.xLabel || '';
+                    inputs.yLabel.value = state.config.yLabel || '';
+                    
+                    if (state.config.orientation) {
+                        const radio = document.querySelector(`input[name="orientation"][value="${state.config.orientation}"]`);
+                        if (radio) radio.checked = true;
+                    }
+                    if (state.config.colorMode) {
+                        const radio = document.querySelector(`input[name="colorMode"][value="${state.config.colorMode}"]`);
+                        if (radio) radio.checked = true;
+                    }
+
+                    inputs.gridSettings.value = state.config.gridSettings || 'horizontal';
+                    inputs.roundingBase.value = state.config.roundingBase || '1';
+                    inputs.singleColorInput.value = state.config.singleColor || '#4F46E5';
+                    inputs.label1.value = state.config.label1 || '數據 A';
+                    inputs.color1.value = state.config.color1 || '#4F46E5';
+                    inputs.label2.value = state.config.label2 || '數據 B';
+                    inputs.color2.value = state.config.color2 || '#EC4899';
+                    
+                    inputs.singleColorInput.disabled = (state.config.colorMode === 'multi');
+                }
+                
+                renderTable();
+                return true;
+            } catch (e) {
+                console.error("Load failed", e);
+                return false;
+            }
+        }
+
+        function setupEventListeners() {
+            const handleUpdate = () => {
+                createChart();
+                saveData();
+            };
+
+            ['title', 'xLabel', 'yLabel', 'gridSettings', 'label1', 'label2'].forEach(key => {
+                if(inputs[key]) inputs[key].addEventListener('input', handleUpdate);
+            });
+
+            ['color1', 'color2'].forEach(key => {
+                inputs[key].addEventListener('input', handleUpdate);
+            });
+
+            inputs.radios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const temp = inputs.xLabel.value;
+                    inputs.xLabel.value = inputs.yLabel.value;
+                    inputs.yLabel.value = temp;
+
+                    // --- 核心修正：自動切換格線 ---
+                    const currentGrid = inputs.gridSettings.value;
+                    if (e.target.value === 'horizontal') {
+                        // 轉為橫向圖表 (Bars are horizontal) -> 需要垂直格線
+                        if (currentGrid === 'horizontal') { // 只有橫線 -> 只有直線
+                            inputs.gridSettings.value = 'vertical';
+                        }
+                    } else {
+                        // 轉為直向圖表 (Bars are vertical) -> 需要水平格線
+                        if (currentGrid === 'vertical') { // 只有直線 -> 只有橫線
+                            inputs.gridSettings.value = 'horizontal';
+                        }
+                    }
+
+                    handleUpdate();
+                });
+            });
+
+            inputs.chartType.addEventListener('change', () => {
+                updateInterfaceMode();
+                renderTable(); 
+                handleUpdate();
+            });
+
+            inputs.colorModeRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    inputs.singleColorInput.disabled = (e.target.value === 'multi');
+                    handleUpdate();
+                });
+            });
+
+            inputs.singleColorInput.addEventListener('input', handleUpdate);
+
+            addRowBtn.addEventListener('click', () => {
+                if (chartData.length < MAX_ITEMS) {
+                    chartData.push({ label: '', value1: 0, value2: 0 });
+                    renderTable();
+                    handleUpdate();
+                    
+                    setTimeout(() => {
+                        const rowInputs = dataTableBody.lastElementChild.querySelectorAll('input');
+                        if(rowInputs.length > 0) rowInputs[0].focus();
+                    }, 50);
+                }
+            });
+        }
+
+        function updateInterfaceMode() {
+            const type = inputs.chartType.value;
+            const isSimple = (type === 'simple');
+
+            const headerVal2 = document.querySelector('.header-val2');
+            colHeaderVal1.innerText = isSimple ? '數值' : '數值 1';
+
+            if(isSimple) headerVal2.classList.add('hidden');
+            else headerVal2.classList.remove('hidden');
+
+            if (isSimple) {
+                inputs.simpleColorConfig.classList.remove('hidden');
+                inputs.complexSeriesSettings.classList.add('hidden');
+            } else {
+                inputs.simpleColorConfig.classList.add('hidden');
+                inputs.complexSeriesSettings.classList.remove('hidden');
+            }
+        }
+
+        window.handleKeyDown = function(e, r, c) {
+            let nextR = r;
+            let nextC = c;
+            let move = false;
+            const type = inputs.chartType.value;
+            const maxCol = (type === 'simple') ? 1 : 2;
+            const target = e.target;
+            const isText = target.type === 'text';
+            const len = target.value.length;
+            const selStart = target.selectionStart;
+
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (c < maxCol) nextC = c + 1;
+                else { nextR = r + 1; nextC = 0; }
+                move = true;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault(); nextR = r - 1; move = true;
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault(); nextR = r + 1; move = true;
+            } else if (e.key === 'ArrowLeft') {
+                if (!isText || selStart === 0) {
+                    if (c > 0) { nextC = c - 1; move = true; e.preventDefault(); }
+                }
+            } else if (e.key === 'ArrowRight') {
+                if (!isText || selStart === len) {
+                    if (c < maxCol) { nextC = c + 1; move = true; e.preventDefault(); }
+                }
+            }
+
+            if (move) {
+                const nextInput = document.querySelector(`input[data-row="${nextR}"][data-col="${nextC}"]`);
+                if (nextInput && !nextInput.closest('td').classList.contains('hidden')) {
+                    nextInput.focus();
+                    nextInput.select(); 
+                }
+            }
+        };
+
+        window.clearItems = function() {
+            chartData.forEach((item, index) => {
+                item.label = '';
+                const inputEl = document.querySelector(`input[data-row="${index}"][data-col="0"]`);
+                if (inputEl) inputEl.value = '';
+            });
+            createChart();
+            saveData();
+        };
+
+        window.clearValues = function() {
+            chartData.forEach((item, index) => {
+                item.value1 = 0;
+                item.value2 = 0;
+                const el1 = document.getElementById(`val1-${index}`);
+                const el2 = document.getElementById(`val2-${index}`);
+                if (el1) el1.value = 0;
+                if (el2) el2.value = 0;
+            });
+            createChart();
+            saveData();
+        };
+
+        window.resetSettings = function() {
+            inputs.title.value = "";
+            inputs.xLabel.value = "";
+            inputs.yLabel.value = "";
+            inputs.gridSettings.value = "horizontal";
+            inputs.roundingBase.value = "1";
+            inputs.chartType.value = "simple";
+            
+            inputs.label1.value = "數據 A";
+            inputs.label2.value = "數據 B";
+            inputs.color1.value = "#4F46E5";
+            inputs.color2.value = "#EC4899";
+
+            const verticalRadio = document.querySelector('input[name="orientation"][value="bar"]');
+            verticalRadio.checked = true;
+
+            document.querySelector('input[name="colorMode"][value="multi"]').checked = true;
+            inputs.singleColorInput.disabled = true;
+            inputs.singleColorInput.value = "#4F46E5";
+
+            updateInterfaceMode();
+            renderTable(); 
+            applyGlobalRounding(); 
+            createChart();
+            saveData(); 
+        };
+
+        window.resetData = function() {
+            chartData = [
+                { label: '', value1: 0, value2: 0 },
+                { label: '', value1: 0, value2: 0 },
+                { label: '', value1: 0, value2: 0 }
+            ];
+            applyGlobalRounding(); 
+            renderTable();
+            createChart();
+            saveData(); 
+        };
+
+        function roundValue(value, base) {
+            base = Number(base);
+            if (base <= 1) return Math.round(value);
+            return Math.round(value / base) * base;
+        }
+
+        window.applyGlobalRounding = function() {
+            const base = Number(inputs.roundingBase.value);
+            if (base > 1) {
+                const selectedText = inputs.roundingBase.options[inputs.roundingBase.selectedIndex].text;
+                const cleanUnit = selectedText.replace(/ \(.+\)/, '');
+                const type = inputs.chartType.value;
+                const baseText = (type === 'simple') ? '數值' : '數值 1';
+                colHeaderVal1.innerHTML = `${baseText} <span class="text-gray-500 block text-[10px] font-normal">(自動四捨五入至${cleanUnit})</span>`;
+            } else {
+                const type = inputs.chartType.value;
+                colHeaderVal1.innerText = (type === 'simple') ? '數值' : '數值 1';
+            }
+
+            chartData.forEach((item, index) => {
+                item.value1 = roundValue(item.value1, base);
+                item.value2 = roundValue(item.value2, base);
+                const el1 = document.getElementById(`val1-${index}`);
+                const el2 = document.getElementById(`val2-${index}`);
+                if (el1) el1.value = item.value1;
+                if (el2) el2.value = item.value2;
+            });
+            createChart();
+        };
+
+        function renderTable() {
+            const type = inputs.chartType.value;
+            const isSimple = (type === 'simple');
+            dataTableBody.innerHTML = '';
+            
+            chartData.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                const placeholderVal1 = isSimple ? '數值' : '數值 1';
+                tr.innerHTML = `
+                    <td class="px-2 py-2">
+                        <input type="text" value="${item.label}" data-row="${index}" data-col="0" onkeydown="handleKeyDown(event, ${index}, 0)" onfocus="this.select()" oninput="updateData(${index}, 'label', this.value)" class="block w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 border p-1" placeholder="項目">
+                    </td>
+                    <td class="px-2 py-2">
+                        <input type="number" id="val1-${index}" value="${item.value1}" data-row="${index}" data-col="1" onkeydown="handleKeyDown(event, ${index}, 1)" onfocus="this.select()" onchange="updateData(${index}, 'value1', this.value)" class="block w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 border p-1" placeholder="${placeholderVal1}">
+                    </td>
+                    <td class="px-2 py-2 ${isSimple ? 'hidden' : ''}">
+                        <input type="number" id="val2-${index}" value="${item.value2}" data-row="${index}" data-col="2" onkeydown="handleKeyDown(event, ${index}, 2)" onfocus="this.select()" onchange="updateData(${index}, 'value2', this.value)" class="block w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 border p-1" placeholder="數值 2">
+                    </td>
+                    <td class="px-2 py-2 text-right">
+                        <button onclick="removeRow(${index})" class="text-red-400 hover:text-red-600 transition-colors p-1 rounded-full hover:bg-red-50" ${chartData.length <= 1 ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 000-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                        </button>
+                    </td>
+                `;
+                dataTableBody.appendChild(tr);
+            });
+            countDisplay.innerText = `${chartData.length} / ${MAX_ITEMS} 項目`;
+            if (chartData.length >= MAX_ITEMS) { addRowBtn.style.display = 'none'; maxLimitMsg.classList.remove('hidden'); } else { addRowBtn.style.display = 'flex'; maxLimitMsg.classList.add('hidden'); }
+        }
+
+        window.updateData = function(index, field, value) {
+            if (field === 'value1' || field === 'value2') {
+                let num = Number(value);
+                const base = Number(inputs.roundingBase.value);
+                num = roundValue(num, base);
+                const mapping = { 'value1': `val1-${index}`, 'value2': `val2-${index}` };
+                const inputEl = document.getElementById(mapping[field]);
+                if (inputEl) inputEl.value = num;
+                chartData[index][field] = num;
+            } else {
+                chartData[index][field] = value;
+            }
+            createChart(); 
+            saveData(); 
+        };
+
+        window.removeRow = function(index) {
+            if (chartData.length > 1) {
+                chartData.splice(index, 1);
+                renderTable();
+                createChart();
+                saveData();
+            }
+        };
+
+        function getChartConfig() {
+            const type = inputs.chartType.value; 
+            const isHorizontal = document.querySelector('input[name="orientation"]:checked').value === 'horizontal';
+            
+            const titleText = inputs.title.value;
+            const xLabelText = inputs.xLabel.value;
+            const yLabelText = inputs.yLabel.value;
+            const gridOption = inputs.gridSettings.value; 
+
+            const axisBottomTitle = xLabelText; 
+            const axisLeftTitle = yLabelText;   
+
+            if (htmlYAxisTitle) htmlYAxisTitle.innerText = axisLeftTitle;
+
+            // --- 核心修改：格線顯示邏輯 ---
+            // 'full' -> Show X and Y grid
+            // 'horizontal' -> Show Y grid lines (horizontal visual lines)
+            // 'vertical' -> Show X grid lines (vertical visual lines)
+            const showYGrid = (gridOption === 'full' || gridOption === 'horizontal');
+            const showXGrid = (gridOption === 'full' || gridOption === 'vertical');
+
+            const datasets = [];
+            const isStacked = (type === 'stacked');
+            
+            if (type === 'simple') {
+                const colorMode = document.querySelector('input[name="colorMode"]:checked').value;
+                let bgColors, borderColors;
+
+                if (colorMode === 'single') {
+                    const singleColor = inputs.singleColorInput.value;
+                    bgColors = singleColor;
+                    borderColors = singleColor;
+                } else {
+                    bgColors = DEFAULT_COLORS;
+                    borderColors = DEFAULT_COLORS;
+                }
+
+                datasets.push({
+                    label: '數值', 
+                    data: chartData.map(d => d.value1),
+                    backgroundColor: bgColors,
+                    borderColor: borderColors,
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    maxBarThickness: 60
+                });
+            } else {
+                datasets.push({
+                    label: inputs.label1.value || '數值 1',
+                    data: chartData.map(d => d.value1),
+                    backgroundColor: inputs.color1.value,
+                    borderColor: inputs.color1.value,
+                    borderWidth: 1,
+                    borderRadius: 2,
+                    maxBarThickness: 60
+                });
+
+                datasets.push({
+                    label: inputs.label2.value || '數值 2',
+                    data: chartData.map(d => d.value2),
+                    backgroundColor: inputs.color2.value,
+                    borderColor: inputs.color2.value,
+                    borderWidth: 1,
+                    borderRadius: 2,
+                    maxBarThickness: 60
+                });
+            }
+
+            return {
+                type: 'bar',
+                data: {
+                    labels: chartData.map(d => d.label),
+                    datasets: datasets
+                },
+                options: {
+                    indexAxis: isHorizontal ? 'y' : 'x',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    devicePixelRatio: 4, 
+                    interaction: {
+                        mode: isStacked ? 'index' : 'nearest',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: { 
+                            display: (type !== 'simple'), 
+                            position: 'top',
+                            align: 'end', 
+                            labels: {
+                                font: { family: "'Noto Sans TC', sans-serif", size: 12 },
+                                color: '#374151',
+                                usePointStyle: true,
+                                boxWidth: 8
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: titleText,
+                            font: { size: 24, family: "'Noto Sans TC', sans-serif", weight: 'bold' },
+                            color: '#1f2937', 
+                            padding: { bottom: 30 } 
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { size: 14 },
+                            bodyFont: { size: 13 }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: isStacked,
+                            title: {
+                                display: true,
+                                text: axisBottomTitle, 
+                                font: { size: 18, weight: 'bold', family: "'Noto Sans TC', sans-serif" },
+                                color: '#4b5563',
+                                padding: { top: 30 } 
+                            },
+                            ticks: {
+                                font: { size: 14, family: "'Noto Sans TC', sans-serif" },
+                                color: '#4b5563'
+                            },
+                            beginAtZero: true,
+                            grace: isHorizontal ? '10%' : 0,
+                            grid: {
+                                display: showXGrid,
+                                drawBorder: true 
+                            }
+                        },
+                        y: {
+                            stacked: isStacked,
+                            title: { display: false },
+                            ticks: {
+                                font: { size: 14, family: "'Noto Sans TC', sans-serif" },
+                                color: '#4b5563'
+                            },
+                            beginAtZero: true,
+                            grace: isHorizontal ? 0 : '10%',
+                            grid: {
+                                display: showYGrid,
+                                drawBorder: true
+                            }
+                        }
+                    },
+                    layout: {
+                        padding: { left: 10, right: 20, top: 0, bottom: 10 }
+                    }
+                }
+            };
+        }
+
+        function createChart() {
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            chartInstance = new Chart(ctx, getChartConfig());
+        }
+
+        window.downloadChart = function() {
+            const chartArea = document.getElementById('chartExportArea');
+            const btn = document.getElementById('downloadBtn');
+            const originalText = btn.innerText;
+            
+            btn.innerText = '處理中...';
+            btn.disabled = true;
+
+            html2canvas(chartArea, {
+                scale: 6, 
+                backgroundColor: '#ffffff',
+                useCORS: true 
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `${inputs.title.value || 'chart'}.png`;
+                link.href = canvas.toDataURL('image/png', 1.0);
+                link.click();
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }).catch(err => {
+                console.error("Export failed:", err);
+                alert("匯出失敗，請稍後再試。");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
