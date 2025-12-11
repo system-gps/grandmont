@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子創世紀：智慧泉</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+            user-select: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #camera-wrapper {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 150px;
+            border-radius: 12px;
+            z-index: 10;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0,0,0,0.5);
+            display: none; 
+            transform: scaleX(-1);
+        }
+
+        #video-feed {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.6;
+        }
+
+        #output-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #toggle-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 21;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        #toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 15px rgba(0, 242, 96, 0.3);
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            width: 280px; 
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(16px);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: white;
+            z-index: 20;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+        }
+
+        #ui-panel.closed {
+            transform: translateX(-150%) scale(0.9);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        h2 {
+            margin: 0 0 20px 0;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: linear-gradient(90deg, #00f260, #0575e6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+
+        .control-group { margin-bottom: 20px; }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+            color: #aaa;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .shape-grid {
+            display: grid;
+            grid-template-columns: 1fr; 
+            gap: 10px;
+        }
+
+        button.shape-btn, button.action-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #ccc;
+            padding: 12px 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; 
+            text-align: left;
+        }
+
+        .btn-icon {
+            font-size: 1.8rem; 
+            margin-right: 15px;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
+        }
+
+        button.shape-btn:hover, button.action-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-color: rgba(255,255,255,0.4);
+            transform: translateY(-2px);
+        }
+
+        button.shape-btn.active, button.action-btn.active {
+            background: rgba(0, 242, 96, 0.15);
+            border-color: #00f260;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(0, 242, 96, 0.3);
+        }
+
+        button.action-btn.active {
+            background: rgba(255, 50, 50, 0.2);
+            border-color: #ff4444;
+            color: #ff4444;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.2);
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: white;
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            padding: 0;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #00f260;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,242,96,0.5);
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 100%;
+            height: 35px;
+            border-radius: 6px;
+            cursor: pointer;
+            background: none;
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+        }
+
+        #energy-bar-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.05);
+            margin-top: 5px;
+            border-radius: 3px;
+            overflow: hidden;
+            display: none;
+        }
+        #energy-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4facfe, #00f2fe, #fff);
+            box-shadow: 0 0 10px #00f2fe;
+            transition: width 0.05s linear;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.75rem;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background-color: #333;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        .dot.active {
+            background-color: #00f260;
+            box-shadow: 0 0 8px #00f260;
+        }
+
+        .gesture-alert {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            z-index: 50;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        #love-detected-msg { color: #ff69b4; text-shadow: 0 0 20px #ff1493; }
+        #saturn-detected-msg { color: #ffd700; text-shadow: 0 0 20px #ffaa00; }
+        #wisdom-detected-msg { color: #00ffff; text-shadow: 0 0 20px #0088ff; }
+
+        #loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: monospace;
+            z-index: 100;
+            text-align: center;
+            pointer-events: none;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">啟動相機中...<br><span style="color:#666; font-size: 0.8em;">請允許使用權限</span></div>
+    
+    <div id="love-detected-msg" class="gesture-alert">❤️ 偵測到愛心 ❤️<br><span style="font-size:0.5em; color:white;">愛心樹已生長</span></div>
+    <div id="saturn-detected-msg" class="gesture-alert">🪐 星系儀啟動 🪐<br><span style="font-size:0.5em; color:white;">多重軌道運轉中</span></div>
+    <div id="wisdom-detected-msg" class="gesture-alert">🙏 智慧合十 🙏<br><span style="font-size:0.5em; color:white;">真理螺旋顯現</span></div>
+
+    <button id="toggle-btn">/// 選單</button>
+
+    <div id="ui-panel">
+        <h2>粒子核心控制</h2>
+        
+        <div class="control-group">
+            <label>系統設定</label>
+            <button id="camera-toggle" class="action-btn">啟用相機 (預設關閉)</button>
+        </div>
+
+        <div class="control-group">
+            <label>模擬模式</label>
+            <div class="shape-grid">
+                <button class="shape-btn active" data-shape="energy_orb">
+                    <span class="btn-icon">🔮</span> 
+                    <div>能量光球<br><span style="font-size:0.7em; color:#888;">凝聚爆發</span></div>
+                </button>
+                <button class="shape-btn" data-shape="heart">
+                    <span class="btn-icon">❤️</span> 
+                    <div>愛心<br><span style="font-size:0.7em; color:#888;">比心觸發樹</span></div>
+                </button>
+                <button class="shape-btn" data-shape="saturn">
+                    <span class="btn-icon">🪐</span> 
+                    <div>土星<br><span style="font-size:0.7em; color:#888;">OK手勢星系</span></div>
+                </button>
+                <button class="shape-btn" data-shape="wisdom_fountain">
+                    <span class="btn-icon">⛲</span> 
+                    <div>智慧泉<br><span style="font-size:0.7em; color:#888;">噴泉瀑布</span></div>
+                </button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>粒子密度 (上限 200k)</label>
+            <select id="particle-count-select">
+                <option value="50000">流暢 (50k)</option>
+                <option value="100000" selected>高畫質 (100k)</option>
+                <option value="200000">極致 (200k)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>視角縮放 (Zoom Level) <span id="zoom-val">1.0</span></label>
+            <input type="range" id="zoom-slider" min="0.1" max="3.0" step="0.1" value="0.8">
+        </div>
+
+        <div class="control-group">
+            <label>粒子顏色</label>
+            <input type="color" id="color-picker" value="#00ffff">
+        </div>
+
+        <div id="energy-bar-container">
+            <div id="energy-bar"></div>
+        </div>
+
+        <div id="status">
+            <div class="dot" id="cam-dot"></div>
+            <span id="status-text">系統待機中</span>
+        </div>
+
+        <div style="margin-top: 15px; font-size: 0.7rem; color: #555; line-height: 1.6;">
+            <strong>操作說明:</strong><br>
+            [相機] 需先切換至對應模式<br>
+            [愛心模式] 比心 -> 愛心樹<br>
+            [長按左鍵 / 握拳] 互動/蓄力<br>
+            [放開] 觸發特效
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+    
+    <div id="camera-wrapper">
+        <video id="video-feed" playsinline></video>
+        <canvas id="output-canvas"></canvas>
+    </div>
+
+    <script>
+        // --- 核心配置 ---
+        const MAX_PARTICLE_COUNT = 200000;
+        let currentParticleCount = 100000;
+        const PARTICLE_SIZE = 0.18;
+        const MORPH_SPEED = 0.08;
+        let CURRENT_SHAPE = 'energy_orb';
+        let BASE_COLOR = new THREE.Color(0x00ffff);
+        
+        let targetTension = 0.5;
+        let currentTension = 0.5;
+        let isHandDetected = false;
+        let isMouseDown = false;
+        let isCameraEnabled = false;
+        
+        // 手勢狀態
+        let isHeartGesture = false; 
+        let isSaturnGesture = false; 
+        let isWisdomGesture = false; 
+        
+        // 特效狀態標記
+        let showHeartTree = false;
+        let showSaturnSpecial = false; 
+        
+        let mouseCoords = new THREE.Vector2(0, 0); 
+        let targetFollowPos = new THREE.Vector2(0, 0); 
+        
+        let zoomLevel = 0.8;
+        
+        let energyCharge = 0; 
+        let isExploding = false;
+        let explosionTimer = 0; 
+        let holdTime = 0; 
+        let returnStrength = 0.0;
+        
+        const energyBar = document.getElementById('energy-bar');
+        const energyBarContainer = document.getElementById('energy-bar-container');
+        const countSelect = document.getElementById('particle-count-select');
+        const colorPicker = document.getElementById('color-picker');
+        const zoomSlider = document.getElementById('zoom-slider');
+        const zoomValDisplay = document.getElementById('zoom-val');
+        const cameraToggleBtn = document.getElementById('camera-toggle');
+        const cameraWrapper = document.getElementById('camera-wrapper');
+        const outputCanvas = document.getElementById('output-canvas');
+        const canvasCtx = outputCanvas.getContext('2d');
+        const videoElement = document.getElementById('video-feed');
+        const loader = document.getElementById('loader');
+        
+        const loveMsg = document.getElementById('love-detected-msg');
+        const saturnMsg = document.getElementById('saturn-detected-msg');
+        const wisdomMsg = document.getElementById('wisdom-detected-msg');
+
+        document.getElementById('toggle-btn').addEventListener('click', (e) => {
+            const panel = document.getElementById('ui-panel');
+            panel.classList.toggle('closed');
+            e.target.innerText = panel.classList.contains('closed') ? '/// 顯示' : '/// 選單';
+        });
+
+        countSelect.addEventListener('change', (e) => {
+            currentParticleCount = parseInt(e.target.value);
+            geometry.setDrawRange(0, currentParticleCount);
+            generateShape(CURRENT_SHAPE);
+        });
+
+        colorPicker.addEventListener('input', (e) => {
+            BASE_COLOR.set(e.target.value);
+        });
+
+        zoomSlider.addEventListener('input', (e) => {
+            zoomLevel = parseFloat(e.target.value);
+            zoomValDisplay.innerText = zoomLevel.toFixed(1);
+        });
+
+        cameraToggleBtn.addEventListener('click', () => {
+            isCameraEnabled = !isCameraEnabled;
+            
+            if (isCameraEnabled) {
+                cameraToggleBtn.innerText = "停止相機";
+                cameraToggleBtn.classList.add('active');
+                cameraWrapper.style.display = 'block';
+                loader.style.display = 'block';
+                cameraFeed.start().then(() => {
+                    loader.style.display = 'none';
+                });
+            } else {
+                cameraToggleBtn.innerText = "啟用相機 (預設關閉)";
+                cameraToggleBtn.classList.remove('active');
+                cameraWrapper.style.display = 'none';
+            }
+        });
+
+        function switchShape(shapeName) {
+            CURRENT_SHAPE = shapeName;
+            
+            document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
+            const btn = document.querySelector(`.shape-btn[data-shape="${shapeName}"]`);
+            if (btn) btn.classList.add('active');
+
+            energyCharge = 0;
+            isExploding = false;
+            explosionTimer = 0;
+            holdTime = 0;
+            returnStrength = 0;
+            
+            if (shapeName === 'heart') showHeartTree = false;
+            if (shapeName === 'saturn') showSaturnSpecial = false;
+            
+            energyBarContainer.style.display = 'block';
+            
+            generateShape(CURRENT_SHAPE);
+        }
+
+        document.querySelectorAll('.shape-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.target.closest('.shape-btn');
+                switchShape(button.dataset.shape);
+            });
+        });
+        
+        energyBarContainer.style.display = 'block';
+
+        document.addEventListener('mousedown', () => isMouseDown = true);
+        document.addEventListener('mouseup', () => isMouseDown = false);
+        document.addEventListener('mousemove', (e) => {
+            mouseCoords.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseCoords.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            
+            if (!isHandDetected) {
+                targetFollowPos.x = mouseCoords.x * 6;
+                targetFollowPos.y = mouseCoords.y * 4;
+            }
+        });
+        document.addEventListener('wheel', (e) => {
+            let newZoom = zoomLevel + e.deltaY * -0.001;
+            newZoom = Math.min(Math.max(0.1, newZoom), 3.0);
+            zoomLevel = newZoom;
+            zoomSlider.value = zoomLevel;
+            zoomValDisplay.innerText = zoomLevel.toFixed(1);
+        });
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.01);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 3000);
+        camera.position.z = 15;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(MAX_PARTICLE_COUNT * 3);
+        const velocities = new Float32Array(MAX_PARTICLE_COUNT * 3);
+        const targetPositions = new Float32Array(MAX_PARTICLE_COUNT * 3); 
+        const randomOffsets = new Float32Array(MAX_PARTICLE_COUNT * 3); 
+        const explosionDirs = new Float32Array(MAX_PARTICLE_COUNT * 3);
+        const colors = new Float32Array(MAX_PARTICLE_COUNT * 3); 
+
+        for (let i = 0; i < MAX_PARTICLE_COUNT; i++) {
+            const idx = i * 3;
+            positions[idx] = 0; positions[idx+1] = 0; positions[idx+2] = 0;
+            targetPositions[idx] = 0;
+            
+            const v = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
+            explosionDirs[idx] = v.x;
+            explosionDirs[idx+1] = v.y;
+            explosionDirs[idx+2] = v.z;
+
+            randomOffsets[idx] = Math.random();
+            randomOffsets[idx+1] = Math.random();
+            randomOffsets[idx+2] = Math.random();
+
+            colors[idx] = BASE_COLOR.r; 
+            colors[idx+1] = BASE_COLOR.g; 
+            colors[idx+2] = BASE_COLOR.b;
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.setDrawRange(0, currentParticleCount);
+
+        const getTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(0.3, 'rgba(255,255,255,0.6)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,32,32);
+            return new THREE.Texture(canvas);
+        };
+        const tex = getTexture();
+        tex.needsUpdate = true;
+
+        const material = new THREE.PointsMaterial({
+            size: PARTICLE_SIZE,
+            map: tex,
+            transparent: true,
+            opacity: 0.9,
+            vertexColors: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+
+        const particleSystem = new THREE.Points(geometry, material);
+        scene.add(particleSystem);
+
+        function getPointInSphere(r) {
+            const u = Math.random();
+            const v = Math.random();
+            const theta = 2 * Math.PI * u;
+            const phi = Math.acos(2 * v - 1);
+            const rad = r * Math.cbrt(Math.random());
+            return [rad * Math.sin(phi) * Math.cos(theta), rad * Math.sin(phi) * Math.sin(theta), rad * Math.cos(phi)];
+        }
+
+        function generateShape(type) {
+            for (let i = 0; i < currentParticleCount; i++) {
+                const idx = i * 3;
+                let x, y, z;
+                
+                if (type === 'heart') {
+                    if (showHeartTree) {
+                        if (randomOffsets[idx] < 0.15) {
+                            const h = Math.random() * 6;
+                            const r = 0.2 + (6-h)*0.1 + (Math.random()-0.5)*0.1;
+                            const theta = Math.random() * Math.PI * 2;
+                            x = r * Math.cos(theta);
+                            y = h - 6;
+                            z = r * Math.sin(theta);
+                        } else {
+                            const t = Math.random() * Math.PI * 2;
+                            const distribution = (Math.random() + Math.random()) / 2; 
+                            const r = 0.6 + distribution * 0.4; 
+                            let hx = 16 * Math.pow(Math.sin(t), 3);
+                            let hy = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+                            x = hx * 0.3 * r;
+                            y = (hy * 0.3 * r) + 2; 
+                            z = (Math.random() - 0.5) * 3 * r;
+                        }
+                    } else {
+                        if (Math.random() < 0.4) {
+                            const t = Math.random() * Math.PI * 2;
+                            const distribution = (Math.random() + Math.random()) / 2; 
+                            const r = 0.6 + distribution * 0.4; 
+                            x = (16 * Math.pow(Math.sin(t), 3)) * 0.25 * r;
+                            y = (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 0.25 * r;
+                            z = (Math.random() - 0.5) * 3 * r;
+                        } else {
+                            const r = 20 + Math.pow(Math.random(), 1.5) * 500; 
+                            const theta = Math.random() * Math.PI * 2;
+                            const phi = Math.acos(2 * Math.random() - 1);
+                            x = r * Math.sin(phi) * Math.cos(theta);
+                            y = r * Math.sin(phi) * Math.sin(theta);
+                            z = r * Math.cos(phi);
+                        }
+                    }
+                } else if (type === 'saturn') {
+                    if (Math.random() > 0.4) {
+                        [x,y,z] = getPointInSphere(3);
+                    } else {
+                        const theta = Math.random() * Math.PI * 2;
+                        const dist = 5 + Math.random() * 3;
+                        x = dist * Math.cos(theta);
+                        z = dist * Math.sin(theta);
+                        y = (Math.random() - 0.5) * 0.3;
+                        const yt = y * Math.cos(0.5) - z * Math.sin(0.5);
+                        const zt = y * Math.sin(0.5) + z * Math.cos(0.5);
+                        y = yt; z = zt;
+                    }
+                } else if (type === 'wisdom_fountain') {
+                    // --- 智慧泉 (Wisdom Fountain) 結構重構 (仲門靈感) ---
+                    // 修改：增加結構體比例至 40% (原30%)，並特別增加正方體密度
+                    if (randomOffsets[idx] < 0.4) {
+                        // === 40% 結構體 ===
+                        const structRand = Math.random();
+                        
+                        // 1. 長方體水池 (40% of struct)
+                        if (structRand < 0.4) {
+                            x = (Math.random() - 0.5) * 10.0;
+                            z = (Math.random() - 0.5) * 6.0;
+                            y = -2.5 + Math.random() * 0.5; // y: -2.5 ~ -2.0
+                        } 
+                        // 2. 正方體台座 (35% of struct - 大幅增加)
+                        // 尺寸: 2x2x1.5 (位於水池中心)
+                        else if (structRand < 0.75) {
+                            x = (Math.random() - 0.5) * 2.0;
+                            z = (Math.random() - 0.5) * 2.0;
+                            y = -2.0 + Math.random() * 1.5; // y: -2.0 ~ -0.5
+                        }
+                        // 3. 雙雕塑 (25% of struct) - 拉近距離，不規則堆疊
+                        else {
+                            const isLeft = Math.random() > 0.5;
+                            const offsetX = isLeft ? -0.4 : 0.4; 
+                            
+                            if (isLeft) {
+                                const h = Math.random() * 5.0; 
+                                const twist = Math.sin(h * 2.0) * 0.3;
+                                const r = 0.4 - h * 0.05 + (Math.random()-0.5)*0.1;
+                                const theta = Math.random() * Math.PI * 2;
+                                x = offsetX + r * Math.cos(theta) + twist;
+                                y = -0.5 + h; 
+                                z = r * Math.sin(theta);
+                            } else {
+                                const h = Math.random() * 3.0;
+                                const w = 0.4 + Math.random() * 0.3; 
+                                const d = 0.4 + Math.random() * 0.3; 
+                                x = offsetX + (Math.random()-0.5) * w;
+                                y = -0.5 + h;
+                                z = (Math.random()-0.5) * d;
+                            }
+                            x = Math.max(-0.9, Math.min(0.9, x));
+                            z = Math.max(-0.9, Math.min(0.9, z));
+                        }
+                    } else {
+                        // === 60% 水源 ===
+                        // 滿佈於水池中 (y ~ -2.0)
+                        x = (Math.random() - 0.5) * 10.0;
+                        z = (Math.random() - 0.5) * 6.0;
+                        y = -2.0 + (Math.random()-0.5) * 0.2; 
+                    }
+                } else {
+                    let r;
+                    const rand = Math.random();
+                    if (rand < 0.2) {
+                        r = 5 + Math.random() * 35;
+                    } else if (rand < 0.5) {
+                        r = 40 + Math.random() * 160;
+                    } else {
+                        r = 200 + Math.pow(Math.random(), 1.5) * 2800;
+                    }
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    x = r * Math.sin(phi) * Math.cos(theta);
+                    y = r * Math.sin(phi) * Math.sin(theta);
+                    z = r * Math.cos(phi);
+                }
+                
+                targetPositions[idx] = x;
+                targetPositions[idx+1] = y;
+                targetPositions[idx+2] = z;
+                
+                if(type === 'energy_orb') {
+                     positions[idx] = x;
+                     positions[idx+1] = y;
+                     positions[idx+2] = z;
+                }
+            }
+        }
+        generateShape('energy_orb');
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5});
+        
+        function dist(p1, p2) {
+            return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2) + Math.pow(p1.z - p2.z, 2));
+        }
+
+        hands.onResults((results) => {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+            canvasCtx.drawImage(results.image, 0, 0, outputCanvas.width, outputCanvas.height);
+            
+            isHeartGesture = false; 
+            isSaturnGesture = false;
+            isWisdomGesture = false;
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                isHandDetected = true;
+                document.getElementById('cam-dot').classList.add('active');
+                document.getElementById('status-text').innerText = "已偵測手部";
+                
+                let tensionSum = 0;
+                let handCenterX = 0;
+                let handCenterY = 0;
+
+                if (results.multiHandLandmarks.length === 2) {
+                    const h1 = results.multiHandLandmarks[0];
+                    const h2 = results.multiHandLandmarks[1];
+                    const thumbDist = dist(h1[4], h2[4]);
+                    const indexDist = dist(h1[8], h2[8]);
+                    
+                    if (thumbDist < 0.15 && indexDist < 0.15) {
+                        isHeartGesture = true;
+                    }
+
+                    // --- 修正：優化智慧合十手勢偵測 ---
+                    // 1. 手腕距離 (0)
+                    const wristDist = dist(h1[0], h2[0]);
+                    // 2. 指尖距離 (中指12, 小指20)
+                    const middleDist = dist(h1[12], h2[12]);
+                    const pinkyDist = dist(h1[20], h2[20]);
+                    
+                    // 邏輯改進：
+                    // A. 標準合十 (放寬距離限制，從 0.20 -> 0.4)
+                    // B. 蓮花手 (只要手腕靠在一起 < 0.25，手指分開也算)
+                    // C. 側面合十 (有時候小指比中指更容易被偵測到靠近)
+                    
+                    if (
+                        (wristDist < 0.4 && middleDist < 0.4) || // 寬鬆合十
+                        (wristDist < 0.4 && pinkyDist < 0.4) ||  // 側面合十
+                        (wristDist < 0.25)                       // 蓮花手/手腕緊貼
+                    ) {
+                        isWisdomGesture = true;
+                    }
+                } 
+                
+                results.multiHandLandmarks.forEach(lm => {
+                    const fingerHeartDist = dist(lm[4], lm[8]);
+                    const wristToMiddleTip = dist(lm[0], lm[12]);
+                    const wristToMiddlePip = dist(lm[0], lm[10]);
+                    const isMiddleExtended = wristToMiddleTip > wristToMiddlePip * 1.2;
+
+                    if (fingerHeartDist < 0.08) {
+                        if (isMiddleExtended) {
+                            isSaturnGesture = true;
+                        } else {
+                            isHeartGesture = true;
+                        }
+                    }
+                });
+
+                if (CURRENT_SHAPE === 'heart' && isHeartGesture) {
+                    loveMsg.style.opacity = 1;
+                    saturnMsg.style.opacity = 0;
+                    wisdomMsg.style.opacity = 0;
+                    if (!showHeartTree) {
+                        showHeartTree = true;
+                        generateShape('heart');
+                    }
+                } 
+                else if (CURRENT_SHAPE === 'saturn' && isSaturnGesture) {
+                    saturnMsg.style.opacity = 1;
+                    loveMsg.style.opacity = 0;
+                    wisdomMsg.style.opacity = 0;
+                    if (!showSaturnSpecial) {
+                         showSaturnSpecial = true;
+                    }
+                } 
+                else if (CURRENT_SHAPE === 'wisdom_fountain' && isWisdomGesture) {
+                    wisdomMsg.style.opacity = 1;
+                    loveMsg.style.opacity = 0;
+                    saturnMsg.style.opacity = 0;
+                } 
+                else {
+                    loveMsg.style.opacity = 0;
+                    saturnMsg.style.opacity = 0;
+                    wisdomMsg.style.opacity = 0;
+                }
+
+                results.multiHandLandmarks.forEach(lm => {
+                    drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
+                    drawLandmarks(canvasCtx, lm, {color: '#FF0000', lineWidth: 1, radius: 3});
+                    const wrist = lm[0];
+                    let d = 0;
+                    [4,8,12,16,20].forEach(i => {
+                        d += Math.hypot(lm[i].x-wrist.x, lm[i].y-wrist.y, lm[i].z-wrist.z);
+                    });
+                    tensionSum += Math.max(0, Math.min(1, (d/5 - 0.1) * 3));
+                    handCenterX += wrist.x;
+                    handCenterY += wrist.y;
+                });
+
+                handCenterX /= results.multiHandLandmarks.length;
+                handCenterY /= results.multiHandLandmarks.length;
+
+                const ndcX = (handCenterX - 0.5) * 2; 
+                const ndcY = -(handCenterY - 0.5) * 2;
+
+                targetFollowPos.x = -ndcX * 6; 
+                targetFollowPos.y = ndcY * 4;
+
+                targetTension = tensionSum / results.multiHandLandmarks.length;
+            } else {
+                isHandDetected = false;
+                isHeartGesture = false;
+                isSaturnGesture = false;
+                isWisdomGesture = false;
+                loveMsg.style.opacity = 0;
+                saturnMsg.style.opacity = 0;
+                wisdomMsg.style.opacity = 0;
+                document.getElementById('cam-dot').classList.remove('active');
+                document.getElementById('status-text').innerText = "未偵測到";
+                targetTension = 0.5;
+            }
+            canvasCtx.restore();
+        });
+
+        const cameraFeed = new Camera(videoElement, {
+            onFrame: async () => {
+                if(isCameraEnabled) {
+                    await hands.send({image: videoElement});
+                }
+            },
+            width: 320, height: 240
+        });
+        
+        outputCanvas.width = 320;
+        outputCanvas.height = 240;
+
+        let time = 0;
+        let heartBeatTime = 0;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            const pos = geometry.attributes.position.array;
+            const col = geometry.attributes.color.array;
+
+            let tension = targetTension;
+            if (isMouseDown) tension = 0; 
+            currentTension += (tension - currentTension) * 0.1;
+            
+            const isInteracting = tension < 0.3 || isHeartGesture || isWisdomGesture;
+
+            let followSpeed = 0.05; 
+            let followAmp = 1.0;    
+            if (zoomLevel < 0.5) {
+                followAmp = 1.0 / Math.max(zoomLevel, 0.2); 
+            }
+
+            particleSystem.position.x += (targetFollowPos.x * followAmp * 0.5 - particleSystem.position.x) * followSpeed;
+            particleSystem.position.y += (targetFollowPos.y * followAmp * 0.5 - particleSystem.position.y) * followSpeed;
+            
+            particleSystem.scale.setScalar(zoomLevel);
+
+            if (CURRENT_SHAPE === 'energy_orb') {
+                // ... (Energy Orb Logic unchanged) ...
+                particleSystem.rotation.y += 0.0005; 
+                if (isInteracting) {
+                    holdTime += 0.016; 
+                    energyCharge += 0.008; 
+                    if(energyCharge > 1) energyCharge = 1;
+                    isExploding = false;
+                    returnStrength = 0; 
+                } else {
+                    if (energyCharge > 0.2) {
+                        isExploding = true;
+                        explosionTimer = 8.0; 
+                    }
+                    energyCharge -= 0.02; 
+                    if(energyCharge < 0) energyCharge = 0;
+                    holdTime = 0; 
+                }
+                energyBar.style.width = `${energyCharge * 100}%`;
+                
+                let radiusMultiplier = 1.0;
+                if (zoomLevel < 0.5) radiusMultiplier = 0.5 / Math.max(zoomLevel, 0.1); 
+                const currentRadius = (4.0 + energyCharge * 4.0) * radiusMultiplier; 
+
+                if (isExploding) {
+                    explosionTimer -= 0.01;
+                    if (explosionTimer < 0) isExploding = false; 
+                }
+
+                for (let i = 0; i < currentParticleCount; i++) {
+                    const idx = i * 3;
+                    const isBackgroundStar = randomOffsets[idx] < 0.3; 
+                    if (isExploding) {
+                        if (!isBackgroundStar) {
+                            if (explosionTimer > 0) {
+                                const cinematicSlowMo = 0.3;
+                                let zoomSpeedBooster = 1.0;
+                                if (zoomLevel < 1.0) zoomSpeedBooster = 1.0 / Math.max(zoomLevel, 0.15);
+                                const randomVal = Math.random();
+                                const randomSpeed = Math.pow(randomVal, 10.0); 
+                                const speedBase = 0.02 + randomSpeed * 0.8; 
+                                const speed = speedBase * (1 + energyCharge * 2.0) * cinematicSlowMo * zoomSpeedBooster;
+                                velocities[idx] = explosionDirs[idx] * speed;
+                                velocities[idx+1] = explosionDirs[idx+1] * speed;
+                                velocities[idx+2] = explosionDirs[idx+2] * speed;
+                            }
+                            pos[idx] += velocities[idx];
+                            pos[idx+1] += velocities[idx+1];
+                            pos[idx+2] += velocities[idx+2];
+                            velocities[idx] *= 0.99; 
+                        } else {
+                             pos[idx] += (Math.random()-0.5) * 0.05;
+                             pos[idx+1] += (Math.random()-0.5) * 0.05;
+                             pos[idx+2] += (Math.random()-0.5) * 0.05;
+                        }
+                        col[idx] = THREE.MathUtils.lerp(col[idx], BASE_COLOR.r, 0.02);
+                        col[idx+1] = THREE.MathUtils.lerp(col[idx+1], BASE_COLOR.g, 0.02);
+                        col[idx+2] = THREE.MathUtils.lerp(col[idx+2], BASE_COLOR.b, 0.02);
+                    } else if (energyCharge > 0.01) {
+                        if (isBackgroundStar) {
+                            const tx = targetPositions[idx];
+                            const ty = targetPositions[idx+1];
+                            const tz = targetPositions[idx+2];
+                            pos[idx] += (tx - pos[idx]) * 0.05;
+                            pos[idx+1] += (ty - pos[idx+1]) * 0.05;
+                            pos[idx+2] += (tz - pos[idx+2]) * 0.05;
+                            col[idx] = BASE_COLOR.r + Math.random() * 0.5;
+                            col[idx+1] = BASE_COLOR.g + Math.random() * 0.5;
+                            col[idx+2] = BASE_COLOR.b + Math.random() * 0.5;
+                        } else {
+                            let shake = Math.pow(energyCharge, 2.5) * 10.0;
+                            if (holdTime > 10) {
+                                const extremeFactor = (holdTime - 10) * 2.0; 
+                                shake += extremeFactor * 5.0; 
+                            }
+                            if (zoomLevel < 0.6) shake *= (1.5 / Math.max(zoomLevel, 0.1));
+                            let tx, ty, tz;
+                            if (randomOffsets[idx] > 0.65) { 
+                                const r = currentRadius * (0.95 + Math.random()*0.1); 
+                                tx = explosionDirs[idx] * r;
+                                ty = explosionDirs[idx+1] * r;
+                                tz = explosionDirs[idx+2] * r;
+                            } else {
+                                const r = currentRadius * Math.random() * 0.9; 
+                                tx = explosionDirs[idx] * r;
+                                ty = explosionDirs[idx+1] * r;
+                                tz = explosionDirs[idx+2] * r;
+                                tx += (Math.random()-0.5) * shake;
+                                ty += (Math.random()-0.5) * shake;
+                                tz += (Math.random()-0.5) * shake;
+                            }
+                            const pullSpeed = 0.03 + energyCharge * 0.05; 
+                            pos[idx] += (tx - pos[idx]) * pullSpeed;
+                            pos[idx+1] += (ty - pos[idx+1]) * pullSpeed;
+                            pos[idx+2] += (tz - pos[idx+2]) * pullSpeed;
+                            velocities[idx] = 0; velocities[idx+1] = 0; velocities[idx+2] = 0;
+                            col[idx] = THREE.MathUtils.lerp(BASE_COLOR.r, 1.0, energyCharge);
+                            col[idx+1] = THREE.MathUtils.lerp(BASE_COLOR.g, 1.0, energyCharge);
+                            col[idx+2] = THREE.MathUtils.lerp(BASE_COLOR.b, 1.0, energyCharge);
+                        }
+                    } else {
+                        returnStrength += 0.00005; 
+                        const smoothReturn = Math.min(returnStrength, 0.02);
+                        const tx = targetPositions[idx];
+                        const ty = targetPositions[idx+1];
+                        const tz = targetPositions[idx+2];
+                        pos[idx] += (tx - pos[idx]) * smoothReturn;
+                        pos[idx+1] += (ty - pos[idx+1]) * smoothReturn;
+                        pos[idx+2] += (tz - pos[idx+2]) * smoothReturn;
+                        pos[idx] += Math.sin(time + idx * 0.1) * 0.02;
+                        pos[idx+1] += Math.cos(time + idx * 0.1) * 0.02;
+                        col[idx] = THREE.MathUtils.lerp(col[idx], BASE_COLOR.r, 0.05);
+                        col[idx+1] = THREE.MathUtils.lerp(col[idx+1], BASE_COLOR.g, 0.05);
+                        col[idx+2] = THREE.MathUtils.lerp(col[idx+2], BASE_COLOR.b, 0.05);
+                    }
+                }
+
+            } else if (CURRENT_SHAPE === 'heart') {
+                // ... (Heart Logic unchanged) ...
+                particleSystem.rotation.y += isInteracting ? 0.05 : 0.005;
+                if (isInteracting) {
+                    energyCharge += 0.01; 
+                    if(energyCharge > 1) energyCharge = 1;
+                    isExploding = false; 
+                    explosionTimer = 0;  
+                    heartBeatTime += 0.2 + energyCharge * 0.6;
+                    const beat = Math.pow(Math.sin(heartBeatTime), 60) * 0.3 + 1.0; 
+                    particleSystem.scale.setScalar(zoomLevel * beat); 
+                } else {
+                    if (energyCharge > 0.3) {
+                        isExploding = true;
+                        explosionTimer = 3.0; // 花瓣飄散時間
+                    }
+                    energyCharge -= 0.05;
+                    if(energyCharge < 0) energyCharge = 0;
+                    particleSystem.scale.setScalar(zoomLevel);
+                }
+                energyBar.style.width = `${energyCharge * 100}%`;
+
+                if (showHeartTree) {
+                    if (isInteracting) {
+                        for (let i = 0; i < currentParticleCount; i++) {
+                            const idx = i * 3;
+                            if (randomOffsets[idx] < 0.15) {
+                                col[idx] = 0.8; col[idx+1] = 0.6; col[idx+2] = 0.2;
+                            } else {
+                                col[idx] = THREE.MathUtils.lerp(col[idx], 1.0, 0.1); 
+                                col[idx+1] = THREE.MathUtils.lerp(col[idx+1], 0.4, 0.1);
+                                col[idx+2] = THREE.MathUtils.lerp(col[idx+2], 0.6, 0.1);
+                                if (Math.random() < 0.1) {
+                                    pos[idx] += (Math.random()-0.5) * 0.1;
+                                    pos[idx+1] += (Math.random()-0.5) * 0.1;
+                                    pos[idx+2] += (Math.random()-0.5) * 0.1;
+                                }
+                            }
+                        }
+                    } else if (isExploding) {
+                        explosionTimer -= 0.015; 
+                        if(explosionTimer < 0) isExploding = false;
+                        for (let i = 0; i < currentParticleCount; i++) {
+                            const idx = i * 3;
+                            if (randomOffsets[idx] >= 0.15) { 
+                                if(explosionTimer > 2.8) {
+                                    velocities[idx] = (Math.random()-0.5) * 0.3;
+                                    velocities[idx+1] = (Math.random()) * 0.3; 
+                                    velocities[idx+2] = (Math.random()-0.5) * 0.3;
+                                }
+                                pos[idx] += velocities[idx];
+                                pos[idx+1] += velocities[idx+1];
+                                pos[idx+2] += velocities[idx+2];
+                                velocities[idx] *= 0.96; 
+                                velocities[idx+1] -= 0.003; 
+                                pos[idx] += Math.sin(time * 5 + idx) * 0.02;
+                            }
+                        }
+                    } else {
+                        for (let i = 0; i < currentParticleCount; i++) {
+                            const idx = i * 3;
+                            if (randomOffsets[idx] < 0.15) {
+                                col[idx] = THREE.MathUtils.lerp(col[idx], 0.6, 0.05);
+                                col[idx+1] = THREE.MathUtils.lerp(col[idx+1], 0.4, 0.05);
+                                col[idx+2] = THREE.MathUtils.lerp(col[idx+2], 0.1, 0.05);
+                            } else {
+                                col[idx] = THREE.MathUtils.lerp(col[idx], 1.0, 0.05);
+                                col[idx+1] = THREE.MathUtils.lerp(col[idx+1], 0.7, 0.05);
+                                col[idx+2] = THREE.MathUtils.lerp(col[idx+2], 0.8, 0.05);
+                            }
+                            const tx = targetPositions[idx];
+                            const ty = targetPositions[idx+1];
+                            const tz = targetPositions[idx+2];
+                            pos[idx] += (tx - pos[idx]) * MORPH_SPEED;
+                            pos[idx+1] += (ty - pos[idx+1]) * MORPH_SPEED;
+                            pos[idx+2] += (tz - pos[idx+2]) * MORPH_SPEED;
+                        }
+                    }
+                } else {
+                    if (isInteracting) {
+                        for (let i = 0; i < currentParticleCount; i++) {
+                            const idx = i * 3;
+                            col[idx] = THREE.MathUtils.lerp(col[idx], 1.0, 0.1); 
+                            col[idx+1] = THREE.MathUtils.lerp(col[idx+1], 0.0, 0.1);
+                            col[idx+2] = THREE.MathUtils.lerp(col[idx+2], 0.2, 0.1);
+                            if (Math.random() < 0.1) {
+                                pos[idx] += (Math.random()-0.5) * 0.2;
+                                pos[idx+1] += (Math.random()-0.5) * 0.2;
+                                pos[idx+2] += (Math.random()-0.5) * 0.2;
+                            }
+                        }
+                    } else if (isExploding) {
+                        explosionTimer -= 0.015;
+                        if(explosionTimer < 0) isExploding = false;
+                        const duration = 3.0;
+                        const progress = 1.0 - Math.max(0, explosionTimer / duration);
+                        const arrowX = -25 + progress * 50; 
+                        for (let i = 0; i < currentParticleCount; i++) {
+                            const idx = i * 3;
+                            if (i % 5 === 0) {
+                                const rnd = randomOffsets[idx];
+                                let ax, ay, az;
+                                if (rnd < 0.6) { 
+                                    ax = (rnd / 0.6) * 4 - 2; 
+                                    ay = 0; az = 0;
+                                } else if (rnd < 0.8) { 
+                                    const t = (rnd - 0.6) / 0.2; 
+                                    ax = 2 + t * 1.5; 
+                                    ay = (1-t) * 0.8 * Math.cos(i);
+                                    az = (1-t) * 0.8 * Math.sin(i);
+                                } else { 
+                                    const t = (rnd - 0.8) / 0.2;
+                                    ax = -2 - t * 1.5;
+                                    ay = t * 1.0 * Math.cos(i);
+                                    az = t * 1.0 * Math.sin(i); 
+                                }
+                                const targetX = ax + arrowX;
+                                pos[idx] += (targetX - pos[idx]) * 0.3;
+                                pos[idx+1] += (ay - pos[idx+1]) * 0.3;
+                                pos[idx+2] += (az - pos[idx+2]) * 0.3;
+                                col[idx] = 1.0; col[idx+1] = 0.9; col[idx+2] = 0.4;
+                            } else {
+                                const tx = targetPositions[idx];
+                                const ty = targetPositions[idx+1];
+                                const tz = targetPositions[idx+2];
+                                const distToArrowPlane = Math.abs(tx - arrowX);
+                                let push = 0;
+                                if (distToArrowPlane < 2.0) {
+                                    push = (2.0 - distToArrowPlane) * 2.5; 
+                                }
+                                const dirY = ty > 0 ? 1 : -1;
+                                const dirZ = tz > 0 ? 1 : -1;
+                                pos[idx] += (tx - pos[idx]) * 0.1; 
+                                pos[idx+1] += (ty + dirY * push - pos[idx+1]) * 0.1;
+                                pos[idx+2] += (tz + dirZ * push - pos[idx+2]) * 0.1;
+                                col[idx] = THREE.MathUtils.lerp(col[idx], BASE_COLOR.r, 0.1);
+                                col[idx+1] = THREE.MathUtils.lerp(col[idx+1], BASE_COLOR.g, 0.1);
+                                col[idx+2] = THREE.MathUtils.lerp(col[idx+2], BASE_COLOR.b, 0.1);
+                            }
+                        }
+                    } else {
+                        for (let i = 0; i < currentParticleCount; i++) {
+                            const idx = i * 3;
+                            col[idx] = THREE.MathUtils.lerp(col[idx], BASE_COLOR.r, 0.05);
+                            col[idx+1] = THREE.MathUtils.lerp(col[idx+1], BASE_COLOR.g, 0.05);
+                            col[idx+2] = THREE.MathUtils.lerp(col[idx+2], BASE_COLOR.b, 0.05);
+                            const tx = targetPositions[idx];
+                            const ty = targetPositions[idx+1];
+                            const tz = targetPositions[idx+2];
+                            pos[idx] += (tx - pos[idx]) * MORPH_SPEED;
+                            pos[idx+1] += (ty - pos[idx+1]) * MORPH_SPEED;
+                            pos[idx+2] += (tz - pos[idx+2]) * MORPH_SPEED;
+                        }
+                    }
+                }
+            } else if (CURRENT_SHAPE === 'saturn') {
+                // ... (Saturn Logic unchanged) ...
+                const baseRot = 0.003;
+                // 按下需加速旋轉
+                particleSystem.rotation.y += baseRot + (isInteracting ? 0.05 + energyCharge * 0.2 : 0);
+                
+                if (!isInteracting) {
+                    particleSystem.rotation.z = Math.sin(time * 0.2) * 0.1; 
+                }
+
+                if (isInteracting) {
+                    energyCharge += 0.01;
+                    if (energyCharge > 1) energyCharge = 1;
+                    isExploding = false;
+                    explosionTimer = 0;
+                } else {
+                    if (energyCharge > 0.3) {
+                        isExploding = true;
+                        explosionTimer = 4.0; 
+                    }
+                    energyCharge -= 0.02;
+                    if (energyCharge < 0) energyCharge = 0;
+                }
+                
+                energyBar.style.width = `${energyCharge * 100}%`;
+
+                if (showSaturnSpecial) {
+                     // ... 星系儀邏輯保持不變 ...
+                     for (let i = 0; i < currentParticleCount; i++) {
+                        const idx = i * 3;
+                        const rnd = randomOffsets[idx];
+                        const isBody = rnd > 0.5;
+                        let tx, ty, tz;
+                        if (isBody) {
+                             [tx, ty, tz] = [targetPositions[idx], targetPositions[idx+1], targetPositions[idx+2]];
+                             tx *= 0.8; ty *= 0.8; tz *= 0.8;
+                             col[idx] = THREE.MathUtils.lerp(col[idx], 1.0, 0.1); 
+                             col[idx+1] = THREE.MathUtils.lerp(col[idx+1], 0.9, 0.1); 
+                             col[idx+2] = THREE.MathUtils.lerp(col[idx+2], 0.5, 0.1); 
+                        } else {
+                            const ringGroup = Math.floor(rnd * 6) % 3; 
+                            const angle = time * (2.0 + ringGroup) + idx * 0.01; 
+                            const radius = 6.0 + Math.sin(time * 2 + idx) * 0.5; 
+                            if (ringGroup === 0) { 
+                                tx = Math.cos(angle) * radius;
+                                ty = Math.sin(angle) * radius;
+                                tz = (Math.random()-0.5) * 0.5;
+                                col[idx] = 0.0; col[idx+1] = 1.0; col[idx+2] = 1.0;
+                            } else if (ringGroup === 1) { 
+                                tx = (Math.random()-0.5) * 0.5;
+                                ty = Math.cos(angle) * radius;
+                                tz = Math.sin(angle) * radius;
+                                col[idx] = 1.0; col[idx+1] = 0.0; col[idx+2] = 1.0;
+                            } else { 
+                                tx = Math.cos(angle) * radius;
+                                ty = (Math.random()-0.5) * 0.5;
+                                tz = Math.sin(angle) * radius;
+                                col[idx] = 1.0; col[idx+1] = 0.8; col[idx+2] = 0.0;
+                            }
+                        }
+                        pos[idx] += (tx - pos[idx]) * 0.1; 
+                        pos[idx+1] += (ty - pos[idx+1]) * 0.1;
+                        pos[idx+2] += (tz - pos[idx+2]) * 0.1;
+                    }
+                } else {
+                    if (isExploding) {
+                        explosionTimer -= 0.02;
+                        if (explosionTimer < 0) isExploding = false;
+                        for (let i = 0; i < currentParticleCount; i++) {
+                            const idx = i * 3;
+                            const isBody = randomOffsets[idx] > 0.5;
+                            if (!isBody) {
+                                if (explosionTimer > 3.0) { 
+                                    velocities[idx] = pos[idx] * 0.05; 
+                                    velocities[idx+1] = pos[idx+1] * 0.05; 
+                                    velocities[idx+2] = pos[idx+2] * 0.05; 
+                                }
+                                pos[idx] += velocities[idx];
+                                pos[idx+1] += velocities[idx+1];
+                                pos[idx+2] += velocities[idx+2];
+                                velocities[idx] *= 0.95; 
+                                col[idx] = THREE.MathUtils.lerp(col[idx], 1.0, 0.1);
+                                col[idx+1] = THREE.MathUtils.lerp(col[idx+1], 1.0, 0.1);
+                                col[idx+2] = THREE.MathUtils.lerp(col[idx+2], 1.0, 0.1);
+                            } else {
+                                 pos[idx] += (Math.random()-0.5) * 0.2;
+                                 pos[idx+1] += (Math.random()-0.5) * 0.2;
+                                 pos[idx+2] += (Math.random()-0.5) * 0.2;
+                                 const tx = targetPositions[idx];
+                                 const ty = targetPositions[idx+1];
+                                 const tz = targetPositions[idx+2];
+                                 pos[idx] += (tx - pos[idx]) * 0.1;
+                                 pos[idx+1] += (ty - pos[idx+1]) * 0.1;
+                                 pos[idx+2] += (tz - pos[idx+2]) * 0.1;
+                            }
+                        }
+                    } else {
+                        for (let i = 0; i < currentParticleCount; i++) {
+                            const idx = i * 3;
+                            const isBody = randomOffsets[idx] > 0.5;
+                            let tx = targetPositions[idx];
+                            let ty = targetPositions[idx+1];
+                            let tz = targetPositions[idx+2];
+
+                            if (isInteracting) {
+                                if (isBody) {
+                                    tx *= (1.0 - energyCharge * 0.3);
+                                    ty *= (1.0 - energyCharge * 0.3);
+                                    tz *= (1.0 - energyCharge * 0.3);
+                                    col[idx] = THREE.MathUtils.lerp(col[idx], 0.1, 0.05); 
+                                    col[idx+1] = THREE.MathUtils.lerp(col[idx+1], 0.0, 0.05); 
+                                    col[idx+2] = THREE.MathUtils.lerp(col[idx+2], 0.2, 0.05); 
+                                } else {
+                                    tx += (Math.random()-0.5) * energyCharge * 0.5;
+                                    ty += (Math.random()-0.5) * energyCharge * 0.5;
+                                    tz += (Math.random()-0.5) * energyCharge * 0.5;
+                                    
+                                    // 變色邏輯：預設 -> 霓虹 -> 金色
+                                    let r_t, g_t, b_t;
+                                    if (energyCharge < 0.2) {
+                                        // 初始階段 (0-20%)：從 BASE_COLOR 開始變
+                                        r_t = BASE_COLOR.r; g_t = BASE_COLOR.g; b_t = BASE_COLOR.b;
+                                    } else if (energyCharge < 0.85) {
+                                        // 霓虹階段 (20-85%)
+                                        const freq = 0.0002;
+                                        const speed = 8.0 + energyCharge * 10.0;
+                                        const phase = time * speed + idx * freq;
+                                        r_t = 0.5 + 0.5 * Math.sin(phase);
+                                        g_t = 0.5 + 0.5 * Math.sin(phase + 2.094);
+                                        b_t = 0.5 + 0.5 * Math.sin(phase + 4.188);
+                                    } else {
+                                        // 金色階段 (>85%)
+                                        r_t = 1.0; g_t = 0.84; b_t = 0.0;
+                                    }
+                                    
+                                    // 使用 lerp 平滑過渡到目標顏色
+                                    col[idx] = THREE.MathUtils.lerp(col[idx], r_t, 0.1);
+                                    col[idx+1] = THREE.MathUtils.lerp(col[idx+1], g_t, 0.1);
+                                    col[idx+2] = THREE.MathUtils.lerp(col[idx+2], b_t, 0.1);
+                                }
+                            } else {
+                                // 閒置回歸預設色
+                                col[idx] = THREE.MathUtils.lerp(col[idx], BASE_COLOR.r, 0.05);
+                                col[idx+1] = THREE.MathUtils.lerp(col[idx+1], BASE_COLOR.g, 0.05);
+                                col[idx+2] = THREE.MathUtils.lerp(col[idx+2], BASE_COLOR.b, 0.05);
+                            }
+                            
+                            pos[idx] += (tx - pos[idx]) * MORPH_SPEED;
+                            pos[idx+1] += (ty - pos[idx+1]) * MORPH_SPEED;
+                            pos[idx+2] += (tz - pos[idx+2]) * MORPH_SPEED;
+                        }
+                    }
+                }
+            } else if (CURRENT_SHAPE === 'wisdom_fountain') {
+                // --- 智慧泉 (Wisdom Fountain) 物理邏輯 ---
+                
+                // 雕像本體自轉
+                particleSystem.rotation.y += 0.002 + (isInteracting ? 0.02 : 0);
+
+                if (isInteracting) {
+                    energyCharge += 0.01;
+                    if (energyCharge > 1) energyCharge = 1;
+                    isExploding = false;
+                } else {
+                    // 放手觸發大噴發
+                    if (energyCharge > 0.2) {
+                         isExploding = true;
+                         explosionTimer = 4.0;
+                    }
+                    energyCharge -= 0.05;
+                    if (energyCharge < 0) energyCharge = 0;
+                }
+                
+                energyBar.style.width = `${energyCharge * 100}%`;
+
+                // 控制噴泉參數
+                const flowIntensity = energyCharge; 
+                // isExploding 時，大噴發全開
+
+                for (let i = 0; i < currentParticleCount; i++) {
+                    const idx = i * 3;
+                    // --- 智慧泉邏輯修正：增加正方體基座比例 ---
+                    // 根據 generateShape 的比例:
+                    // 結構 < 0.4
+                    //   - 長方體水池 < 0.4 (16% of total)
+                    //   - 正方體台座 < 0.75 (14% of total)
+                    //   - 雙雕塑 else (10% of total)
+                    const rnd = randomOffsets[idx];
+                    
+                    const isStructure = rnd < 0.4;
+
+                    if (isStructure) {
+                        // === 雕像與基座 (靜態) ===
+                        const tx = targetPositions[idx];
+                        const ty = targetPositions[idx+1];
+                        const tz = targetPositions[idx+2];
+                        
+                        pos[idx] += (tx - pos[idx]) * MORPH_SPEED;
+                        pos[idx+1] += (ty - pos[idx+1]) * MORPH_SPEED;
+                        pos[idx+2] += (tz - pos[idx+2]) * MORPH_SPEED;
+                        
+                        // 顏色邏輯細分
+                        if (rnd < 0.4 * 0.4) {
+                            // 長方體水池 (深石色)
+                            col[idx] = 0.4; col[idx+1] = 0.4; col[idx+2] = 0.4;
+                        } else if (rnd < 0.4 * 0.75) {
+                            // 正方體基座 (淺石色)
+                            col[idx] = 0.7; col[idx+1] = 0.65; col[idx+2] = 0.6;
+                        } else {
+                            // 雙雕塑 (深銅色)
+                            col[idx] = 0.55; col[idx+1] = 0.35; col[idx+2] = 0.2;
+                        }
+
+                    } else {
+                        // === 水粒子 (動態) ===
+                        
+                        if (isExploding) {
+                            // --- 修正: 還原為瀑布模式 (從邊緣落下) ---
+                            // 瀑布計時器
+                            if(i==0) explosionTimer -= 0.01; // 只減一次
+                            if(explosionTimer < 0) isExploding = false;
+                            
+                            // 瀑布源頭：底座平面附近 (y ~ -2.0)
+                            // 隨機重置位置到上方，形成連續水流
+                            if (pos[idx+1] < -10.0 || Math.random() < 0.05) {
+                                // 在底座範圍內隨機生成
+                                // 長方體底座邊緣: x: +/-4, z: +/-2 (根據 generateShape 定義)
+                                
+                                // 隨機選擇四個邊緣之一
+                                const edge = Math.floor(Math.random() * 4);
+                                let startX, startZ;
+                                
+                                // 水池寬 10, 深 6 (半徑 5, 3)
+                                if (edge === 0) { // 前
+                                    startX = (Math.random()-0.5) * 10.0;
+                                    startZ = 3.0;
+                                } else if (edge === 1) { // 後
+                                    startX = (Math.random()-0.5) * 10.0;
+                                    startZ = -3.0;
+                                } else if (edge === 2) { // 左
+                                    startX = -5.0;
+                                    startZ = (Math.random()-0.5) * 6.0;
+                                } else { // 右
+                                    startX = 5.0;
+                                    startZ = (Math.random()-0.5) * 6.0;
+                                }
+                                
+                                pos[idx] = startX;
+                                pos[idx+1] = -2.0; // 從底座邊緣高度落下
+                                pos[idx+2] = startZ;
+                                
+                                velocities[idx] = 0;
+                                velocities[idx+1] = -0.1 - Math.random() * 0.2; // 向下初速
+                                velocities[idx+2] = 0;
+                            }
+                            
+                            // 重力加速
+                            velocities[idx+1] -= 0.05; 
+                            
+                            pos[idx] += velocities[idx];
+                            pos[idx+1] += velocities[idx+1];
+                            pos[idx+2] += velocities[idx+2];
+                            
+                            // 顏色：深藍色瀑布
+                            col[idx] = 0.0; col[idx+1] = 0.1; col[idx+2] = 0.6;
+
+                        } else if (flowIntensity > 0.05) {
+                            // --- 連續噴泉模式 (修正：隨長按增高，超過雕塑) ---
+                            // 修正：從長方體範圍隨機噴出
+                            
+                            // 如果粒子落回底座 (y < -2.5) 或飛太遠，重置發射
+                            if (pos[idx+1] < -2.5) {
+                                // 重置到水池表面任意位置
+                                const poolW = 8.0;
+                                const poolD = 4.0;
+                                pos[idx] = (Math.random()-0.5) * poolW;
+                                pos[idx+1] = -2.0; 
+                                pos[idx+2] = (Math.random()-0.5) * poolD;
+                                
+                                // --- 修改點：移除高度限制，隨能量大幅增高 ---
+                                // 雕塑最高點約 y = 4.5 (基座 -2.0) -> 需要高度差 > 6.5
+                                // 根據 h = v^2 / 2g (g=0.01) -> v ~ 0.36 可達高度 6.5
+                                // 設定速度範圍：0.1 (低湧) ~ 0.5 (高噴，超過雕塑)
+                                
+                                const speedY = 0.1 + flowIntensity * 0.4 + Math.random() * 0.1;
+                                
+                                // 擴散範圍也隨力度增加 (噴得更遠)
+                                const spread = 0.02 + flowIntensity * 0.08;
+                                
+                                velocities[idx] = (Math.random()-0.5) * spread;
+                                velocities[idx+1] = speedY; 
+                                velocities[idx+2] = (Math.random()-0.5) * spread;
+                                
+                                pos[idx+1] += Math.random() * 0.2;
+                            }
+                            
+                            velocities[idx+1] -= 0.01;
+                            
+                            pos[idx] += velocities[idx];
+                            pos[idx+1] += velocities[idx+1];
+                            pos[idx+2] += velocities[idx+2];
+                            
+                            // 顏色：隨高度變得更白亮 (氣泡感)
+                            const heightFactor = Math.max(0, (pos[idx+1] + 2.0) * 0.1);
+                            col[idx] = heightFactor * 0.5; 
+                            col[idx+1] = 0.6 + heightFactor * 0.4; 
+                            col[idx+2] = 0.9 + heightFactor * 0.1;
+                            
+                        } else if (isWisdomGesture) {
+                            // --- 新增：智慧合十手勢觸發真理螺旋 ---
+                            // 水流化為金色雙螺旋上升
+                            
+                            const helixRadius = 1.5;
+                            const helixSpeed = 2.0;
+                            const riseSpeed = 0.05;
+                            const strand = (idx % 2 === 0) ? 1 : -1; // 雙股
+                            
+                            const angle = time * helixSpeed + pos[idx+1] * 0.5;
+                            
+                            // 目標位置計算
+                            const tx = Math.cos(angle + strand * Math.PI) * helixRadius;
+                            const tz = Math.sin(angle + strand * Math.PI) * helixRadius;
+                            
+                            // 向上流動
+                            pos[idx+1] += riseSpeed;
+                            if (pos[idx+1] > 6.0) pos[idx+1] = -2.0; // 循環
+                            
+                            // 水平位置逼近
+                            pos[idx] += (tx - pos[idx]) * 0.1;
+                            pos[idx+2] += (tz - pos[idx+2]) * 0.1;
+                            
+                            // 金色
+                            col[idx] = 1.0; col[idx+1] = 0.8; col[idx+2] = 0.0;
+                            
+                        } else {
+                            // --- 靜止模式 (滿池春水 - 修正覆蓋) ---
+                            // 水在底座長方體範圍內流動
+                            
+                            // 修正：使用 full range
+                            const poolW = 10.0;
+                            const poolD = 6.0;
+                            
+                            // 重新映射隨機位置
+                            // (randomOffsets - 0.5) * 10
+                            // 修正：使用 GenerateShape 裡設定好的 targetPositions
+                            // 確保水面覆蓋與初始生成一致
+                            const tx = targetPositions[idx]; 
+                            // 但我們只取其 x, z，y 強制在水面 -2.0
+                            
+                            const wave = Math.sin(time * 2.0 + tx * 0.5) * 0.1 + Math.cos(time * 1.5 + targetPositions[idx+2] * 0.5) * 0.1;
+                            const ty = -2.0 + wave; 
+                            const tz = targetPositions[idx+2];
+                            
+                            // 快速緩動以填滿
+                            pos[idx] += (tx - pos[idx]) * 0.1;
+                            pos[idx+1] += (ty - pos[idx+1]) * 0.1;
+                            pos[idx+2] += (tz - pos[idx+2]) * 0.1;
+                            
+                            // 顏色：平靜深藍
+                            col[idx] = 0.0; col[idx+1] = 0.3; col[idx+2] = 0.5; 
+                        }
+                    }
+                }
+            }
+
+            geometry.attributes.position.needsUpdate = true;
+            geometry.attributes.color.needsUpdate = true;
+            renderer.render(scene, camera);
+        }
+
+        animate();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
