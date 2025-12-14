@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業棒形圖產生器 v6.0 (智慧格線版)</title>
+    <title>專業棒形圖產生器 v6.1</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Chart.js -->
@@ -42,6 +42,14 @@
         .transition-all-300 {
             transition: all 0.3s ease-in-out;
         }
+        /* Modal 動畫 */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        body.modal-active {
+            overflow-x: hidden;
+            overflow-y: hidden !important;
+        }
     </style>
 </head>
 <body class="text-slate-800 min-h-screen flex flex-col">
@@ -49,8 +57,17 @@
     <header class="bg-indigo-600 text-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight">📊 棒形圖產生器 v6.0</h1>
-                <p class="text-indigo-100 text-sm mt-1">自動儲存 • 複合圖表 • 智慧格線</p>
+                <h1 class="text-2xl font-bold tracking-tight">📊 棒形圖產生器 v6.1</h1>
+                <p class="text-indigo-100 text-sm mt-1">簡單易用 • 自動儲存 • 單一/複合圖表• 直向/橫向圖表</p>
+            </div>
+            <!-- 新增：使用說明按鈕 -->
+            <div>
+                <button id="openHelpBtn" class="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    使用說明
+                </button>
             </div>
         </div>
     </header>
@@ -127,7 +144,6 @@
                                     <select id="gridSettings" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 text-sm bg-white">
                                         <option value="full">完整格線 (Full)</option>
                                         <option value="horizontal" selected>只有橫線 (Horizontal Only)</option>
-                                        <!-- 新增：只有直線 -->
                                         <option value="vertical">只有直線 (Vertical Only)</option>
                                         <option value="none">不顯示 (None)</option>
                                     </select>
@@ -187,6 +203,7 @@
                         </h2>
                         <div class="flex items-center space-x-2">
                             <span id="countDisplay" class="text-xs font-medium px-2 py-1 rounded bg-gray-100 text-gray-600">3 / 10 項目</span>
+                            <!-- 清除項目與清除數值按鈕 -->
                             <button onclick="clearItems()" class="text-xs text-gray-500 hover:text-orange-600 border border-gray-300 hover:border-orange-600 px-2 py-1 rounded transition-colors" title="只清除項目名稱">
                                 ↺ 清除項目
                             </button>
@@ -257,6 +274,55 @@
 
     <footer class="bg-white border-t border-gray-200 mt-auto"></footer>
 
+    <!-- 使用說明 Modal -->
+    <div id="helpModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        
+        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto transform transition-all scale-95 duration-300">
+            
+            <div class="modal-content py-4 text-left px-6">
+                <!-- Title -->
+                <div class="flex justify-between items-center pb-3 border-b">
+                    <p class="text-2xl font-bold text-indigo-600">使用說明</p>
+                    <div class="modal-close cursor-pointer z-50" id="closeHelpBtn">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Body -->
+                <div class="my-5 text-sm text-gray-700 space-y-3">
+                    <div>
+                        <h3 class="font-bold text-gray-900 mb-1">1. 基本操作</h3>
+                        <p>在左側面板設定圖表標題、軸名稱。選擇「直向」或「橫向」可即時切換圖表顯示。</p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 mb-1">2. 數據輸入</h3>
+                        <p>在表格中輸入項目名稱與數值。支援使用 <kbd class="bg-gray-100 border rounded px-1">Enter</kbd> 與方向鍵快速移動焦點。</p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 mb-1">3. 複合圖表</h3>
+                        <p>選擇「兩棒並排」或「兩棒連接」模式，表格會自動出現第二組數值欄位。</p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 mb-1">4. 清除功能</h3>
+                        <p>使用「清除項目」只刪除文字；「清除數值」只歸零數字，方便重複使用模板。</p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 mb-1">5. 匯出與儲存</h3>
+                        <p>點擊右上角按鈕下載高解析度 PNG 圖片。系統會自動儲存您的設定，重新整理網頁資料不會遺失。</p>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="flex justify-end pt-2">
+                    <button class="modal-close-btn px-4 py-2 bg-indigo-600 p-3 rounded-lg text-white hover:bg-indigo-500 focus:outline-none">關閉</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const STORAGE_KEY = 'chart_generator_v5_data';
         const MAX_ITEMS = 10;
@@ -305,6 +371,55 @@
             color2: document.getElementById('color2')
         };
 
+        // --- Modal Logic ---
+        const openHelpBtn = document.getElementById('openHelpBtn');
+        const helpModal = document.getElementById('helpModal');
+        const closeHelpBtn = document.getElementById('closeHelpBtn');
+        const closeHelpBtnBottom = document.querySelector('.modal-close-btn');
+        const modalOverlay = document.querySelector('.modal-overlay');
+        const modalContainer = document.querySelector('.modal-container');
+
+        function toggleModal() {
+            const body = document.querySelector('body');
+            const modal = document.querySelector('.modal');
+            
+            modal.classList.toggle('opacity-0');
+            modal.classList.toggle('pointer-events-none');
+            body.classList.toggle('modal-active');
+            
+            // Scale effect
+            if (!modal.classList.contains('opacity-0')) {
+                modalContainer.classList.remove('scale-95');
+                modalContainer.classList.add('scale-100');
+            } else {
+                modalContainer.classList.remove('scale-100');
+                modalContainer.classList.add('scale-95');
+            }
+        }
+
+        openHelpBtn.addEventListener('click', function(event) {
+            event.preventDefault();
+            toggleModal();
+        });
+
+        modalOverlay.addEventListener('click', toggleModal);
+        closeHelpBtn.addEventListener('click', toggleModal);
+        closeHelpBtnBottom.addEventListener('click', toggleModal);
+
+        document.onkeydown = function(evt) {
+            evt = evt || window.event;
+            var isEscape = false;
+            if ("key" in evt) {
+                isEscape = (evt.key === "Escape" || evt.key === "Esc");
+            } else {
+                isEscape = (evt.keyCode === 27);
+            }
+            if (isEscape && document.body.classList.contains('modal-active')) {
+                toggleModal();
+            }
+        };
+
+        // --- 初始化應用程式 ---
         function init() {
             if (loadData()) {
                 // 數據已載入
@@ -316,6 +431,7 @@
             setupEventListeners();
         }
 
+        // --- 自動儲存系統 ---
         function saveData() {
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
@@ -387,6 +503,7 @@
             }
         }
 
+        // --- 事件監聽器設定 ---
         function setupEventListeners() {
             const handleUpdate = () => {
                 createChart();
@@ -407,16 +524,14 @@
                     inputs.xLabel.value = inputs.yLabel.value;
                     inputs.yLabel.value = temp;
 
-                    // --- 核心修正：自動切換格線 ---
+                    // 自動切換格線
                     const currentGrid = inputs.gridSettings.value;
                     if (e.target.value === 'horizontal') {
-                        // 轉為橫向圖表 (Bars are horizontal) -> 需要垂直格線
-                        if (currentGrid === 'horizontal') { // 只有橫線 -> 只有直線
+                        if (currentGrid === 'horizontal') { 
                             inputs.gridSettings.value = 'vertical';
                         }
                     } else {
-                        // 轉為直向圖表 (Bars are vertical) -> 需要水平格線
-                        if (currentGrid === 'vertical') { // 只有直線 -> 只有橫線
+                        if (currentGrid === 'vertical') { 
                             inputs.gridSettings.value = 'horizontal';
                         }
                     }
@@ -668,15 +783,12 @@
             const yLabelText = inputs.yLabel.value;
             const gridOption = inputs.gridSettings.value; 
 
+            // 邏輯轉換：直向圖時，Left=Y；橫向圖時，Left=X (Category)
             const axisBottomTitle = xLabelText; 
             const axisLeftTitle = yLabelText;   
 
             if (htmlYAxisTitle) htmlYAxisTitle.innerText = axisLeftTitle;
 
-            // --- 核心修改：格線顯示邏輯 ---
-            // 'full' -> Show X and Y grid
-            // 'horizontal' -> Show Y grid lines (horizontal visual lines)
-            // 'vertical' -> Show X grid lines (vertical visual lines)
             const showYGrid = (gridOption === 'full' || gridOption === 'horizontal');
             const showXGrid = (gridOption === 'full' || gridOption === 'vertical');
 
