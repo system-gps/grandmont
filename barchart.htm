@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業棒形圖產生器 v6.9</title>
+    <title>專業棒形圖產生器 v7.0 </title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Chart.js -->
@@ -55,16 +55,14 @@
             left: 1px;
             letter-spacing: 0;
         }
-        /* 開括號：向上移少許，放寬下方間距 */
         .rotate-open {
-            top: -3px;            /* 向上移動 */
+            top: -3px;            
             margin-top: -2px;
-            margin-bottom: -0.4em; /* 放寬負邊距，減少緊密度 */
+            margin-bottom: -0.4em; 
         }
-        /* 關括號：向下移動少許，放寬上方間距 */
         .rotate-close {
-            top: 2px;             /* 向下移動 */
-            margin-top: -0.4em;    /* 放寬負邊距，減少緊密度 */
+            top: 2px;             
+            margin-top: -0.4em;    
             margin-bottom: -2px;
         }
 
@@ -86,7 +84,7 @@
     <header class="bg-indigo-600 text-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight">📊 棒形圖產生器 v6.9</h1>
+                <h1 class="text-2xl font-bold tracking-tight">📊 棒形圖產生器 v7.0</h1>
                 <p class="text-indigo-100 text-sm mt-1">自動儲存 • 複合圖表 • 智慧格線</p>
             </div>
             <!-- 使用說明按鈕 -->
@@ -290,8 +288,8 @@
                     </div>
 
                     <div class="relative flex-1 w-full bg-white rounded-lg p-4 border border-gray-100 flex flex-row items-stretch overflow-hidden" id="chartExportArea">
-                        <!-- 縱軸標題容器 -->
-                        <div class="flex-shrink-0 flex justify-center items-center px-0 mr-1">
+                        <!-- 縱軸標題容器：增加 mr-4 (距離) 和 pb-8 (向上位移) -->
+                        <div class="flex-shrink-0 flex justify-center items-center px-0 mr-4 pb-8">
                             <span id="htmlYAxisTitle" class="vertical-text-span font-bold text-gray-600 text-lg select-none">分數</span>
                         </div>
                         <div class="relative flex-1 min-w-0">
