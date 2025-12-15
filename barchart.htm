@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業棒形圖產生器 v6.2 (Emoji 說明版)</title>
+    <title>專業棒形圖產生器 v6.9</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Chart.js -->
@@ -36,9 +36,38 @@
         .vertical-text-span {
             writing-mode: vertical-rl;
             text-orientation: upright;
-            letter-spacing: 0.2rem;
+            letter-spacing: 0.1rem;
             white-space: nowrap;
+            line-height: 1.5;
         }
+        
+        /* --- 核心修正：空白格壓縮 --- */
+        .vertical-space {
+            display: inline-block;
+            height: 4px;
+        }
+
+        /* --- 核心修正：括號位置微調 --- */
+        .rotate-char {
+            display: inline-block;
+            transform: rotate(90deg);
+            position: relative;
+            left: 1px;
+            letter-spacing: 0;
+        }
+        /* 開括號：向上移少許，放寬下方間距 */
+        .rotate-open {
+            top: -3px;            /* 向上移動 */
+            margin-top: -2px;
+            margin-bottom: -0.4em; /* 放寬負邊距，減少緊密度 */
+        }
+        /* 關括號：向下移動少許，放寬上方間距 */
+        .rotate-close {
+            top: 2px;             /* 向下移動 */
+            margin-top: -0.4em;    /* 放寬負邊距，減少緊密度 */
+            margin-bottom: -2px;
+        }
+
         .transition-all-300 {
             transition: all 0.3s ease-in-out;
         }
@@ -57,10 +86,10 @@
     <header class="bg-indigo-600 text-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight">📊 棒形圖產生器 v6.2</h1>
+                <h1 class="text-2xl font-bold tracking-tight">📊 棒形圖產生器 v6.9</h1>
                 <p class="text-indigo-100 text-sm mt-1">自動儲存 • 複合圖表 • 智慧格線</p>
             </div>
-            <!-- 新增：使用說明按鈕 (含 Emoji) -->
+            <!-- 使用說明按鈕 -->
             <div>
                 <button id="openHelpBtn" class="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
                     <span class="text-lg mr-1">📖</span> 使用說明
@@ -261,7 +290,8 @@
                     </div>
 
                     <div class="relative flex-1 w-full bg-white rounded-lg p-4 border border-gray-100 flex flex-row items-stretch overflow-hidden" id="chartExportArea">
-                        <div class="flex-shrink-0 flex justify-center items-center px-2">
+                        <!-- 縱軸標題容器 -->
+                        <div class="flex-shrink-0 flex justify-center items-center px-0 mr-1">
                             <span id="htmlYAxisTitle" class="vertical-text-span font-bold text-gray-600 text-lg select-none">分數</span>
                         </div>
                         <div class="relative flex-1 min-w-0">
@@ -389,7 +419,6 @@
             modal.classList.toggle('pointer-events-none');
             body.classList.toggle('modal-active');
             
-            // Scale effect
             if (!modal.classList.contains('opacity-0')) {
                 modalContainer.classList.remove('scale-95');
                 modalContainer.classList.add('scale-100');
@@ -784,11 +813,29 @@
             const yLabelText = inputs.yLabel.value;
             const gridOption = inputs.gridSettings.value; 
 
-            // --- 修改：直觀對應，不隨方向對調變數 ---
+            // --- 軸標題對應 ---
             const axisBottomTitle = xLabelText; 
             const axisLeftTitle = yLabelText;   
 
-            if (htmlYAxisTitle) htmlYAxisTitle.innerText = axisLeftTitle;
+            // --- 核心修正：括號旋轉與空白格邏輯 ---
+            if (htmlYAxisTitle) {
+                let safeText = axisLeftTitle.replace(/&/g, "&amp;")
+                                            .replace(/</g, "&lt;")
+                                            .replace(/>/g, "&gt;")
+                                            .replace(/"/g, "&quot;")
+                                            .replace(/'/g, "&#039;");
+                
+                // 1. 處理空白格：包裹在 span 中以控制高度
+                safeText = safeText.replace(/ /g, '<span class="vertical-space"> </span>');
+
+                // 2. 處理開括號
+                safeText = safeText.replace(/(\(|（)/g, '<span class="rotate-char rotate-open">$1</span>');
+                
+                // 3. 處理關括號
+                safeText = safeText.replace(/(\)|）)/g, '<span class="rotate-char rotate-close">$1</span>');
+                
+                htmlYAxisTitle.innerHTML = safeText;
+            }
 
             const showYGrid = (gridOption === 'full' || gridOption === 'horizontal');
             const showXGrid = (gridOption === 'full' || gridOption === 'vertical');
@@ -918,7 +965,13 @@
                         }
                     },
                     layout: {
-                        padding: { left: 10, right: 20, top: 0, bottom: 10 }
+                        padding: { 
+                            // 縮減左側留白，因為我們將標題拉近了
+                            left: 0, 
+                            right: 20, 
+                            top: 0, 
+                            bottom: 10 
+                        }
                     }
                 }
             };
