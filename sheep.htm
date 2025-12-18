@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>牧場大逃亡 - 經典狼群回歸</title>
+    <style>
+        :root {
+            --bg-color: #7cfc00;
+            --panel-bg: rgba(255, 255, 255, 0.95);
+            --text-color: #2c3e50;
+            --accent-color: #e91e63;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #2d5a27;
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, #4caf50 0%, #2e7d32 100%);
+        }
+
+        canvas {
+            display: block;
+            cursor: default;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+            font-size: 18px;
+            z-index: 10;
+        }
+
+        .stat-item {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+        }
+
+        #active-powerup-ui {
+            margin-top: 15px;
+            padding: 12px;
+            background: #2c3e50; 
+            border-radius: 12px;
+            border: 2px solid #fff;
+        }
+
+        .powerup-bar {
+            width: 120px;
+            height: 10px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 5px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+
+        #powerup-progress {
+            width: 100%;
+            height: 100%;
+            background: #ffd700;
+        }
+
+        #overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.4s ease;
+        }
+
+        .menu-card {
+            background: var(--panel-bg);
+            padding: 30px;
+            border-radius: 30px;
+            text-align: center;
+            color: var(--text-color);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            max-width: 90%;
+            width: 360px;
+            border: 4px solid #fff;
+        }
+
+        h1 { margin: 0 0 15px; color: #d35400; font-size: 26px; }
+
+        .legend {
+            text-align: left;
+            font-size: 13px;
+            margin: 15px 0;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 15px;
+            border: 1px solid #eee;
+            line-height: 1.6;
+        }
+
+        button {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: white;
+            border: none;
+            padding: 12px 45px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0px #1b5e20;
+            transition: all 0.1s;
+        }
+
+        button:active {
+            transform: translateY(3px);
+            box-shadow: 0 3px 0px #1b5e20;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui-layer">
+        <div class="stat-item">⏱️ 時間: <span id="time-display">0.0</span>s</div>
+        <div class="stat-item">🐺 狼群: <span id="wolf-count">0</span></div>
+        <div id="active-powerup-ui" class="hidden">
+            <div id="powerup-name" style="font-size: 14px; color: #ffd700; font-weight: bold;">✨ 無敵中</div>
+            <div class="powerup-bar"><div id="powerup-progress"></div></div>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <div class="menu-card" id="start-menu">
+            <h1>🐑 正面小綿羊生存挑戰</h1>
+            <div class="legend">
+                <b>🐺 狼群種類：</b><br>
+                • <span style="color:#7f8c8d">深灰</span>：森林狼，穩定追蹤<br>
+                • <span style="color:#d35400">暗紅</span>：獵手狼，迅捷衝刺<br>
+                • <span style="color:#2c3e50">墨藍</span>：首領狼，體型壓制<br><br>
+                <b>✨ 生存道具：</b><br>
+                • 🌾 黃金牧草：變身無敵閃閃羊<br>
+                • ⏱️ 時鐘：緩速所有狼群<br>
+                • 🧪 縮小藥：體積縮小更易閃躲
+            </div>
+            <button onclick="startGame()">開始挑戰</button>
+        </div>
+        
+        <div class="menu-card hidden" id="game-over-menu">
+            <h1 style="color: var(--accent-color);">💖 抱抱時間</h1>
+            <p>你在牧場堅持了</p>
+            <div id="final-score" style="font-size: 50px; font-weight: 900; color: var(--accent-color); margin: 5px 0;">0.0</div>
+            <p style="margin-bottom: 25px;">秒</p>
+            <button onclick="startGame()">重新開始</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const timeDisplay = document.getElementById('time-display');
+    const wolfCountDisplay = document.getElementById('wolf-count');
+    const overlay = document.getElementById('overlay');
+    const powerupUI = document.getElementById('active-powerup-ui');
+    const powerupProgress = document.getElementById('powerup-progress');
+    const powerupName = document.getElementById('powerup-name');
+    const finalScoreDisplay = document.getElementById('final-score');
+
+    let gameActive = false;
+    let isEndingAnimation = false;
+    let score = 0;
+    let startTime = 0;
+    let wolves = [];
+    let items = [];
+    let particles = [];
+    let decorations = [];
+    let shake = 0;
+
+    let sheep = { 
+        x: 0, 
+        y: 0, 
+        radius: 15, // 調整碰撞半徑以配合小巧身形
+        displayRadius: 15,
+        pulse: 0, 
+        powerup: null, 
+        powerupTime: 0,
+        jumpY: 0,
+        legCycle: 0
+    };
+
+    let mouse = { x: 0, y: 0 };
+    let lastWolfSpawn = 0;
+    let lastItemSpawn = 0;
+
+    function initEnvironment() {
+        decorations = [];
+        const count = (canvas.width * canvas.height) / 18000;
+        for(let i=0; i < count; i++) {
+            decorations.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                type: Math.random() > 0.8 ? 'flower' : 'grass',
+                color: ['#fff', '#ffd700', '#ffc0cb'][Math.floor(Math.random()*3)],
+                swayOffset: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        initEnvironment();
+        if (!gameActive) {
+            mouse.x = canvas.width / 2;
+            mouse.y = canvas.height / 2;
+            sheep.x = mouse.x;
+            sheep.y = mouse.y;
+        }
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    const updateInput = (x, y) => {
+        if (!isEndingAnimation) {
+            mouse.x = x;
+            mouse.y = y;
+        }
+    };
+    window.addEventListener('mousemove', e => updateInput(e.clientX, e.clientY));
+    window.addEventListener('touchmove', e => {
+        updateInput(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+    }, { passive: false });
+
+    class Item {
+        constructor() {
+            this.x = Math.random() * (canvas.width - 100) + 50;
+            this.y = Math.random() * (canvas.height - 100) + 50;
+            const r = Math.random();
+            if (r < 0.35) this.type = 'invincible';
+            else if (r < 0.7) this.type = 'slow';
+            else this.type = 'tiny'; 
+            this.radius = 20;
+            this.pulse = 0;
+        }
+        draw() {
+            this.pulse += 0.05;
+            const s = 1 + Math.sin(this.pulse * 2) * 0.15;
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.scale(s, s);
+            
+            let color = '#ffd700';
+            let icon = '🌾';
+            if (this.type === 'slow') { color = '#00bfff'; icon = '⏱️'; }
+            if (this.type === 'tiny') { color = '#a29bfe'; icon = '🧪'; }
+
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.fill();
+            
+            ctx.font = '18px Arial';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(icon, 0, 0);
+            ctx.restore();
+        }
+    }
+
+    class Wolf {
+        constructor() {
+            const side = Math.floor(Math.random() * 4);
+            const padding = 120;
+            if (side === 0) { this.x = Math.random() * canvas.width; this.y = -padding; }
+            else if (side === 1) { this.x = canvas.width + padding; this.y = Math.random() * canvas.height; }
+            else if (side === 2) { this.x = Math.random() * canvas.width; this.y = canvas.height + padding; }
+            else { this.x = -padding; this.y = Math.random() * canvas.height; }
+
+            const rand = Math.random();
+            if (rand < 0.6) this.type = 'normal';
+            else if (rand < 0.85) this.type = 'sprinter';
+            else this.type = 'giant';
+
+            this.radius = this.type === 'giant' ? 30 : 16;
+            this.angle = 0;
+            this.legCycle = 0;
+            this.orbitAngle = Math.random() * Math.PI * 2;
+            this.orbitRadius = 60 + Math.random() * 40;
+            this.sprintPhase = Math.random() * 10;
+        }
+
+        update(others) {
+            if (isEndingAnimation) {
+                this.orbitAngle += 0.04;
+                const tx = sheep.x + Math.cos(this.orbitAngle) * this.orbitRadius;
+                const ty = sheep.y + Math.sin(this.orbitAngle) * this.orbitRadius;
+                this.x += (tx - this.x) * 0.1;
+                this.y += (ty - this.y) * 0.1;
+                this.angle = Math.atan2(sheep.y - this.y, sheep.x - this.x);
+                this.legCycle += 0.3;
+                return;
+            }
+
+            const difficultyScale = 1 + (score / 60);
+            let speed = (this.type === 'giant' ? 1.4 : (this.type === 'sprinter' ? 1.8 : 2.0)) * difficultyScale;
+            
+            if (this.type === 'sprinter') {
+                this.sprintPhase += 0.06;
+                if (Math.sin(this.sprintPhase) > 0.4) speed *= 2.5;
+            }
+            if (sheep.powerup === 'slow') speed *= 0.45;
+
+            const dx = sheep.x - this.x;
+            const dy = sheep.y - this.y;
+            this.angle = Math.atan2(dy, dx);
+
+            let vx = Math.cos(this.angle) * speed;
+            let vy = Math.sin(this.angle) * speed;
+
+            others.forEach(o => {
+                if (o === this) return;
+                const d = Math.hypot(this.x - o.x, this.y - o.y);
+                const min = this.radius + o.radius + 8;
+                if (d < min) {
+                    vx += (this.x - o.x) / d * 1.2;
+                    vy += (this.y - o.y) / d * 1.2;
+                }
+            });
+
+            this.x += vx;
+            this.y += vy;
+            this.legCycle += (speed * 0.25);
+        }
+
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            // 腳印陰影
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            ctx.beginPath(); ctx.ellipse(0, this.radius * 0.7, this.radius, this.radius * 0.3, 0, 0, Math.PI*2); ctx.fill();
+
+            ctx.rotate(this.angle);
+            const s = this.type === 'giant' ? 1.4 : (this.type === 'sprinter' ? 0.9 : 1.0);
+
+            let bodyColor = '#7f8c8d';
+            let darkColor = '#616a6b';
+            if (this.type === 'sprinter') { bodyColor = '#d35400'; darkColor = '#a04000'; }
+            if (this.type === 'giant') { bodyColor = '#2c3e50'; darkColor = '#1a252f'; }
+            if (sheep.powerup === 'slow') { bodyColor = '#3498db'; darkColor = '#2980b9'; }
+
+            // 繪製狼腿
+            ctx.fillStyle = darkColor;
+            const legMove = Math.sin(this.legCycle) * 7 * s;
+            ctx.beginPath(); ctx.arc(6*s, -10*s + legMove, 4*s, 0, Math.PI*2); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(6*s, 10*s - legMove, 4*s, 0, Math.PI*2); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(-10*s, -9*s - legMove, 4*s, 0, Math.PI*2); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(-10*s, 9*s + legMove, 4*s, 0, Math.PI*2); ctx.fill();
+
+            // 繪製狼尾巴
+            ctx.save();
+            ctx.rotate(Math.sin(this.legCycle * 0.4) * 0.5);
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.moveTo(-15*s, 0);
+            ctx.quadraticCurveTo(-25*s, -10*s, -35*s, 0);
+            ctx.quadraticCurveTo(-25*s, 10*s, -15*s, 0);
+            ctx.fill();
+            ctx.restore();
+
+            // 繪製狼身
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.ellipse(-3*s, 0, 20*s, 14*s, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // 繪製頸部毛髮
+            ctx.beginPath();
+            ctx.moveTo(8*s, -12*s);
+            ctx.lineTo(12*s, -16*s);
+            ctx.lineTo(14*s, -10*s);
+            ctx.lineTo(18*s, -12*s);
+            ctx.lineTo(15*s, 0);
+            ctx.lineTo(18*s, 12*s);
+            ctx.lineTo(14*s, 10*s);
+            ctx.lineTo(12*s, 16*s);
+            ctx.lineTo(8*s, 12*s);
+            ctx.fill();
+
+            // 繪製狼頭
+            ctx.beginPath();
+            ctx.ellipse(15*s, 0, 14*s, 11*s, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // 吻部 (長吻)
+            ctx.beginPath();
+            ctx.ellipse(25*s, 0, 10*s, 6.5*s, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // 尖耳朵
+            ctx.fillStyle = darkColor;
+            ctx.beginPath();
+            ctx.moveTo(10*s, -8*s);
+            ctx.lineTo(12*s, -22*s);
+            ctx.lineTo(18*s, -8*s);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(10*s, 8*s);
+            ctx.lineTo(12*s, 22*s);
+            ctx.lineTo(18*s, 8*s);
+            ctx.fill();
+
+            // 鼻子
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(33*s, 0, 3*s, 0, Math.PI*2); ctx.fill();
+
+            // 眼睛
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(19*s, -4.5*s, 4*s, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(19*s, 4.5*s, 4*s, 0, Math.PI*2); ctx.fill();
+            
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(21*s, -4.5*s, 2*s, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(21*s, 4.5*s, 2*s, 0, Math.PI*2); ctx.fill();
+            
+            ctx.restore();
+        }
+    }
+
+    function spawnParticle(x, y, color, type = 'dot') {
+        particles.push({
+            x, y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            life: 1.0,
+            color,
+            type
+        });
+    }
+
+    function drawSheep() {
+        ctx.save();
+        ctx.translate(sheep.x, sheep.y + sheep.jumpY);
+        
+        // 維持正面精緻小綿羊的縮放比例 (0.8 基礎)
+        const scale = 0.8 * (sheep.powerup === 'tiny' ? 0.6 : 1.0) * (1 + Math.sin(sheep.pulse) * 0.05);
+        ctx.scale(scale, scale);
+
+        // 底部陰影
+        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        ctx.beginPath(); ctx.ellipse(0, 16, 18, 8, 0, 0, Math.PI*2); ctx.fill();
+
+        // 畫四條纖細的小黑腿 (正面對稱排列)
+        ctx.fillStyle = '#333';
+        const legOffset = Math.sin(sheep.legCycle) * 5;
+        ctx.fillRect(-12, 5 + legOffset, 4, 10);
+        ctx.fillRect(8, 5 - legOffset, 4, 10);
+        ctx.fillRect(-6, 8 - legOffset, 4, 8);
+        ctx.fillRect(2, 8 + legOffset, 4, 8);
+
+        // 無敵光環
+        if (sheep.powerup === 'invincible') {
+            ctx.beginPath();
+            ctx.arc(0, 0, 38, 0, Math.PI*2);
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        }
+
+        // 畫雲朵般的蓬鬆身體 (正面視角)
+        ctx.fillStyle = '#ffffff';
+        const puffPositions = [
+            [0, 0, 18],       // 中心
+            [-12, -10, 13],   // 左上
+            [12, -10, 13],    // 右上
+            [-12, 10, 13],    // 左下
+            [12, 10, 13],     // 右下
+            [0, -15, 12],     // 正上
+            [0, 15, 12],      // 正下
+            [-18, 0, 12],     // 正左
+            [18, 0, 12]       // 正右
+        ];
+        puffPositions.forEach(p => {
+            ctx.beginPath(); ctx.arc(p[0], p[1], p[2], 0, Math.PI*2); ctx.fill();
+        });
+
+        // 畫正面小羊臉
+        ctx.save();
+        ctx.translate(0, -2); 
+        
+        // 膚色臉部
+        ctx.fillStyle = '#fce4ec';
+        ctx.beginPath(); ctx.ellipse(0, 0, 12, 10, 0, 0, Math.PI*2); ctx.fill();
+
+        // 對稱小垂耳
+        ctx.beginPath(); ctx.ellipse(-11, -3, 3.5, 7, Math.PI/6, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(11, -3, 3.5, 7, -Math.PI/6, 0, Math.PI*2); ctx.fill();
+
+        // 眼睛
+        ctx.fillStyle = '#333';
+        if (isEndingAnimation) {
+            ctx.font = 'bold 12px Arial'; ctx.textAlign='center'; ctx.fillText('❤️', 0, 4);
+        } else {
+            ctx.beginPath(); ctx.arc(-4, -1, 2.2, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -1, 2.2, 0, Math.PI*2); ctx.fill();
+        }
+        
+        // 粉紅腮紅
+        ctx.fillStyle = 'rgba(255, 192, 203, 0.8)';
+        ctx.beginPath(); ctx.arc(-6, 3, 2.5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(6, 3, 2.5, 0, Math.PI*2); ctx.fill();
+        
+        ctx.restore();
+        ctx.restore();
+    }
+
+    function startGame() {
+        gameActive = true;
+        isEndingAnimation = false;
+        score = 0;
+        wolves = [];
+        items = [];
+        particles = [];
+        startTime = Date.now();
+        lastWolfSpawn = 0;
+        lastItemSpawn = Date.now();
+        sheep.powerup = null;
+        sheep.powerupTime = 0;
+        sheep.displayRadius = sheep.radius;
+        powerupUI.classList.add('hidden');
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            document.getElementById('start-menu').classList.add('hidden');
+            document.getElementById('game-over-menu').classList.add('hidden');
+        }, 400);
+    }
+
+    function triggerGameOver() {
+        if (!gameActive) return;
+        gameActive = false;
+        isEndingAnimation = true;
+        shake = 18;
+        finalScoreDisplay.innerText = score.toFixed(1);
+        for(let i=0; i<45; i++) spawnParticle(sheep.x, sheep.y, '#e91e63', 'heart');
+        setTimeout(() => {
+            overlay.classList.remove('hidden');
+            overlay.style.opacity = '1';
+            document.getElementById('game-over-menu').classList.remove('hidden');
+        }, 2000);
+    }
+
+    function gameLoop() {
+        let sx = 0, sy = 0;
+        if (shake > 0) {
+            sx = (Math.random()-0.5) * shake;
+            sy = (Math.random()-0.5) * shake;
+            shake *= 0.92;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(sx, sy);
+
+        decorations.forEach(d => {
+            const sway = Math.sin(Date.now()*0.002 + d.swayOffset) * 5;
+            if (d.type === 'grass') {
+                ctx.strokeStyle = '#558b2f'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(d.x, d.y);
+                ctx.quadraticCurveTo(d.x + sway, d.y - 8, d.x + sway*1.2, d.y - 14);
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = d.color;
+                ctx.beginPath(); ctx.arc(d.x + sway, d.y, 4, 0, Math.PI*2); ctx.fill();
+            }
+        });
+
+        if (gameActive || isEndingAnimation) {
+            if (gameActive) {
+                score = (Date.now() - startTime) / 1000;
+                timeDisplay.innerText = score.toFixed(1);
+                wolfCountDisplay.innerText = wolves.length;
+                const dx = mouse.x - sheep.x;
+                const dy = mouse.y - sheep.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 5) {
+                    sheep.x += dx * 0.16;
+                    sheep.y += dy * 0.16;
+                    sheep.legCycle += 0.25;
+                }
+            } else {
+                sheep.jumpY = -Math.abs(Math.sin(Date.now() * 0.012)) * 30;
+                sheep.legCycle += 0.1;
+            }
+            sheep.pulse += 0.1;
+
+            if (sheep.powerup) {
+                const remain = sheep.powerupTime - Date.now();
+                if (remain <= 0) {
+                    sheep.powerup = null;
+                    sheep.displayRadius = sheep.radius;
+                    powerupUI.classList.add('hidden');
+                } else {
+                    powerupUI.classList.remove('hidden');
+                    const total = sheep.powerup === 'tiny' ? 10000 : 6000;
+                    powerupProgress.style.width = (remain / total * 100) + '%';
+                    powerupName.innerText = sheep.powerup === 'invincible' ? '✨ 黃金無敵' : (sheep.powerup === 'slow' ? '⏱️ 緩速時光' : '🧪 迷你羊');
+                }
+            }
+
+            if (gameActive && Date.now() - lastItemSpawn > 8000) {
+                items.push(new Item());
+                lastItemSpawn = Date.now();
+            }
+
+            items.forEach((it, i) => {
+                it.draw();
+                if (gameActive && Math.hypot(sheep.x - it.x, sheep.y - it.y) < sheep.displayRadius + it.radius) {
+                    sheep.powerup = it.type;
+                    const duration = it.type === 'tiny' ? 10000 : 6000;
+                    sheep.powerupTime = Date.now() + duration;
+                    if (it.type === 'tiny') sheep.displayRadius = sheep.radius * 0.6;
+                    items.splice(i, 1);
+                    for(let j=0; j<20; j++) spawnParticle(it.x, it.y, '#ffffff');
+                }
+            });
+
+            if (gameActive) {
+                const interval = Math.max(250, 1200 - (score * 40));
+                if (Date.now() - lastWolfSpawn > interval) {
+                    wolves.push(new Wolf());
+                    lastWolfSpawn = Date.now();
+                }
+            }
+
+            wolves.forEach((w, i) => {
+                w.update(wolves);
+                w.draw();
+                if (gameActive) {
+                    const dist = Math.hypot(sheep.x - w.x, sheep.y - w.y);
+                    const hitBox = sheep.displayRadius + (w.radius * 0.7);
+                    if (dist < hitBox) {
+                        if (sheep.powerup === 'invincible') {
+                            for(let j=0; j<15; j++) spawnParticle(w.x, w.y, '#7f8c8d');
+                            wolves.splice(i, 1);
+                            shake = 10;
+                        } else {
+                            triggerGameOver();
+                        }
+                    }
+                }
+            });
+
+            drawSheep();
+        }
+
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.025;
+            ctx.save();
+            ctx.globalAlpha = p.life;
+            if (p.type === 'heart') {
+                ctx.font = 'bold 18px Arial'; ctx.fillText('❤️', p.x, p.y);
+            } else {
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+            }
+            ctx.restore();
+            if (p.life <= 0) particles.splice(i, 1);
+        });
+
+        ctx.restore();
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+</script>
+</body>
+</html>
