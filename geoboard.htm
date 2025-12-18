@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>互動平面圖形繪圖板 v4.7 (線條移動修復版)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+        #canvas-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #e2e8f0;
+        }
+        canvas {
+            cursor: crosshair;
+            background-color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: block; 
+            flex-shrink: 0;
+        }
+        .tool-btn.active {
+            background-color: #eff6ff;
+            color: #2563eb;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 1px #2563eb;
+        }
+        #text-tool-overlay {
+            position: absolute;
+            display: none;
+            z-index: 100;
+            pointer-events: auto;
+            user-select: none;
+            transform: translate(0, -50%);
+        }
+        #floating-input {
+            user-select: text;
+        }
+        /* 優化後的橡皮擦游標 */
+        .cursor-eraser {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgba(239, 68, 68, 0.3)" stroke="red" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4" /></svg>') 12 12, auto !important;
+        }
+        /* 強制選取工具為標準游標 */
+        .cursor-default {
+            cursor: default !important;
+        }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col md:flex-row text-slate-700">
+
+    <!-- 左側工具欄 -->
+    <aside class="w-full md:w-80 bg-white border-r border-slate-200 flex flex-col shadow-lg z-20 h-auto md:h-full shrink-0">
+        <!-- 標題 -->
+        <div class="p-4 border-b border-slate-100 bg-gradient-to-r from-blue-50/50 to-white">
+            <h1 class="text-lg font-bold text-blue-900 flex items-center gap-2">
+                <i class="ph ph-polygon text-2xl text-blue-600"></i>
+                幾何繪圖板
+                <span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded ml-1">v4.7</span>
+            </h1>
+            <p class="text-xs text-slate-500 mt-1 pl-8">數學幾何教學工具</p>
+        </div>
+
+        <!-- 設定面板 -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-6 custom-scroll">
+            
+            <!-- 工具選擇 -->
+            <section>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">操作工具</h3>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button id="btn-select" class="tool-btn flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50 col-span-2 justify-center" onclick="setTool('select')">
+                        <i class="ph ph-cursor text-lg"></i> 選取 / 移動 / 編輯
+                    </button>
+                </div>
+
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">繪圖工具</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-pen" class="tool-btn active flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50" onclick="setTool('pen')">
+                        <i class="ph ph-line-segment text-lg"></i> 單線
+                    </button>
+                    <button id="btn-poly" class="tool-btn flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50" onclick="setTool('poly')">
+                        <i class="ph ph-polygon text-lg"></i> 連續線
+                    </button>
+                    <button id="btn-angle" class="tool-btn flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50" onclick="setTool('angle')">
+                        <i class="ph ph-angle text-lg"></i> 標示角度
+                    </button>
+                    <button id="btn-text" class="tool-btn flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50" onclick="setTool('text')">
+                        <i class="ph ph-text-t text-lg"></i> 輸入文字
+                    </button>
+                    <button id="btn-eraser" class="tool-btn flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50 col-span-2" onclick="setTool('eraser')">
+                        <i class="ph ph-eraser text-lg"></i> 橡皮擦
+                    </button>
+                </div>
+            </section>
+
+            <!-- 樣式設定 -->
+            <section class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-xs font-bold text-slate-500">筆畫設定</label>
+                    <span id="width-display" class="text-xs font-mono text-slate-400">4px</span>
+                </div>
+                <div class="flex gap-2 mb-3 flex-wrap">
+                    <button class="color-btn w-6 h-6 rounded-full ring-2 ring-offset-1 ring-slate-800" style="background-color: #1e293b;" onclick="setColor(this, '#1e293b')"></button>
+                    <button class="color-btn w-6 h-6 rounded-full border border-slate-200" style="background-color: #ef4444;" onclick="setColor(this, '#ef4444')"></button>
+                    <button class="color-btn w-6 h-6 rounded-full border border-slate-200" style="background-color: #3b82f6;" onclick="setColor(this, '#3b82f6')"></button>
+                    <button class="color-btn w-6 h-6 rounded-full border border-slate-200" style="background-color: #10b981;" onclick="setColor(this, '#10b981')"></button>
+                    <button class="color-btn w-6 h-6 rounded-full border border-slate-200" style="background-color: #f59e0b;" onclick="setColor(this, '#f59e0b')"></button>
+                    <input type="color" class="w-6 h-6 rounded-full overflow-hidden border-0 cursor-pointer" onchange="setColor(this, this.value)" title="自訂顏色">
+                </div>
+                <input type="range" id="width-slider" min="2" max="12" value="4" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 mb-3">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="dashed-toggle" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" onchange="toggleDashed(this.checked)">
+                    <span class="text-sm font-medium text-slate-600">使用虛線</span>
+                </label>
+            </section>
+
+            <!-- 底板與測量 -->
+            <section>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">底板與測量</h3>
+                <div class="flex bg-slate-100 p-1 rounded-lg mb-3">
+                    <button id="mode-geoboard" onclick="setBoardMode('geoboard')" class="flex-1 py-1.5 text-xs font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all">釘板</button>
+                    <button id="mode-grid" onclick="setBoardMode('grid')" class="flex-1 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all">方格</button>
+                    <button id="mode-blank" onclick="setBoardMode('blank')" class="flex-1 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all">空白</button>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="text-[10px] text-slate-500 block mb-1">網格顏色</label>
+                        <div class="flex items-center gap-2">
+                            <input type="color" id="grid-color-picker" value="#cbd5e1" class="h-8 w-full rounded cursor-pointer border border-slate-200" oninput="setGridColor(this.value)">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-slate-500 block mb-1">間距大小</label>
+                        <input type="range" id="spacing-slider" min="20" max="200" value="100" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-500 mt-2">
+                    </div>
+                </div>
+                <label class="flex items-center justify-between p-2 bg-blue-50 border border-blue-100 rounded-lg cursor-pointer">
+                    <div class="flex items-center gap-2">
+                        <i class="ph ph-ruler text-blue-600 text-lg"></i>
+                        <span class="text-sm font-bold text-blue-800">顯示測量數值</span>
+                    </div>
+                    <div class="relative inline-block w-10 h-5 transition duration-200 ease-in-out">
+                        <input type="checkbox" id="measure-toggle" class="peer absolute w-0 h-0 opacity-0" onchange="toggleMeasure(this.checked)">
+                        <span class="block w-full h-full bg-slate-300 rounded-full shadow-inner peer-checked:bg-blue-600 transition-colors"></span>
+                        <span class="absolute left-1 top-1 bg-white w-3 h-3 rounded-full shadow transition-transform peer-checked:translate-x-5"></span>
+                    </div>
+                </label>
+            </section>
+        </div>
+
+        <!-- 底部功能 -->
+        <div class="p-4 border-t border-slate-200 bg-slate-50 space-y-2 mt-auto">
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="undo()" class="flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50 font-medium">
+                    <i class="ph ph-arrow-u-up-left text-lg"></i> 復原
+                </button>
+                <button onclick="downloadImage()" class="flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50 font-medium">
+                    <i class="ph ph-download-simple text-lg"></i> 存圖
+                </button>
+            </div>
+            <button onclick="clearAll()" class="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 border border-red-200 text-red-600 rounded text-sm hover:bg-red-100 font-medium">
+                <i class="ph ph-trash text-lg"></i> 全部清除
+            </button>
+        </div>
+    </aside>
+
+    <!-- 繪圖區 -->
+    <main class="flex-1 relative p-4 overflow-hidden flex flex-col">
+        <div id="canvas-wrapper" class="relative flex-1 rounded-xl shadow-inner overflow-hidden select-none">
+            <canvas id="mainCanvas"></canvas>
+            
+            <div id="text-tool-overlay" class="bg-white/95 backdrop-blur shadow-xl border border-blue-200 rounded-lg p-2 flex flex-col gap-2 min-w-[180px]">
+                <input type="text" id="floating-input" class="w-full bg-transparent text-slate-800 font-bold text-lg outline-none border-b border-slate-200 pb-1 focus:border-blue-500 transition-colors" placeholder="輸入文字..." autocomplete="off">
+                
+                <div class="flex gap-1 justify-between">
+                    <button class="hover:bg-blue-100 text-blue-700 rounded px-2 py-1 text-sm font-bold transition" onmousedown="event.preventDefault(); insertSymbol('+')">+</button>
+                    <button class="hover:bg-blue-100 text-blue-700 rounded px-2 py-1 text-sm font-bold transition" onmousedown="event.preventDefault(); insertSymbol('-')">-</button>
+                    <button class="hover:bg-blue-100 text-blue-700 rounded px-2 py-1 text-sm font-bold transition" onmousedown="event.preventDefault(); insertSymbol('×')">×</button>
+                    <button class="hover:bg-blue-100 text-blue-700 rounded px-2 py-1 text-sm font-bold transition" onmousedown="event.preventDefault(); insertSymbol('÷')">÷</button>
+                    <button class="hover:bg-blue-100 text-blue-700 rounded px-2 py-1 text-sm font-bold transition" onmousedown="event.preventDefault(); insertSymbol('°')">°</button>
+                    <button class="hover:bg-blue-100 text-blue-700 rounded px-2 py-1 text-sm font-bold transition" onmousedown="event.preventDefault(); insertSymbol('²')">²</button>
+                </div>
+            </div>
+
+            <div id="toast" class="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800/90 backdrop-blur text-white text-xs px-4 py-2 rounded-full opacity-0 transition-opacity pointer-events-none z-10 shadow-lg">
+                提示訊息
+            </div>
+            <div id="angle-instruction" class="hidden absolute bottom-4 left-1/2 -translate-x-1/2 bg-blue-600/90 text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium z-10 flex items-center gap-2">
+                <i class="ph ph-info"></i>
+                <span id="angle-step-text">請點擊第一個點 (側邊)</span>
+            </div>
+        </div>
+        <p class="text-center text-xs text-slate-400 mt-2">
+            提示：使用「選取工具」來移動線條、縮放角度或編輯文字
+        </p>
+    </main>
+
+    <script>
+        const config = {
+            gridSpacing: 100, 
+            pointRadius: 2,
+            snapThreshold: 15,
+            defaultColor: '#1e293b',
+            defaultWidth: 4
+        };
+
+        const state = {
+            tool: 'pen',
+            mode: 'geoboard',
+            color: config.defaultColor,
+            width: config.defaultWidth,
+            isDashed: false,
+            gridColor: '#cbd5e1',
+            showMeasures: false,
+            
+            lines: [],
+            labels: [], 
+            angles: [], 
+            
+            isDrawing: false,
+            startPoint: null,
+            currentPoint: null,
+            pointerPos: null,
+            polyPoints: [], 
+            
+            angleStep: 0,
+            anglePoints: [],
+
+            selection: {
+                type: null,
+                index: -1,
+                subtype: null,
+                isDragging: false,
+                isResizing: false,
+                startPos: null,
+                itemStartPos: null,
+                lineStartP1: null,
+                lineStartP2: null,
+                itemStartRadius: 0,
+                itemStartDist: 0
+            },
+
+            history: [],
+            hoveredObject: null
+        };
+
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const inputEl = document.getElementById('floating-input');
+        const inputContainer = document.getElementById('text-tool-overlay'); 
+        const wrapper = document.getElementById('canvas-wrapper');
+        const toastEl = document.getElementById('toast');
+        const angleInstrEl = document.getElementById('angle-instruction');
+        const angleStepText = document.getElementById('angle-step-text');
+
+        function init() {
+            const resizeObserver = new ResizeObserver(() => { requestAnimationFrame(resizeCanvas); });
+            resizeObserver.observe(wrapper);
+            resizeCanvas();
+
+            canvas.addEventListener('mousedown', onPointerDown);
+            canvas.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('mouseup', onPointerUp);
+            canvas.addEventListener('touchstart', (e) => handleTouch(e, onPointerDown), {passive: false});
+            canvas.addEventListener('touchmove', (e) => handleTouch(e, onPointerMove), {passive: false});
+            window.addEventListener('touchend', onPointerUp);
+
+            window.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z') undo();
+                if (e.key === 'Escape') { cancelPoly(); resetAngleTool(); deselect(); }
+                if (e.key === 'Enter' && state.tool === 'poly') finishPoly();
+                if ((e.key === 'Delete' || e.key === 'Backspace') && state.selection.index !== -1) deleteSelected();
+            });
+
+            inputEl.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') confirmText(); if (e.key === 'Escape') cancelText(); });
+            inputEl.addEventListener('blur', confirmText);
+
+            document.getElementById('width-slider').addEventListener('input', (e) => { state.width = parseInt(e.target.value); document.getElementById('width-display').innerText = state.width + 'px'; });
+            document.getElementById('spacing-slider').addEventListener('input', (e) => { config.gridSpacing = parseInt(e.target.value); resizeCanvas(); });
+
+            saveHistory();
+            draw();
+        }
+
+        function handleTouch(e, callback) { e.preventDefault(); const touch = e.touches[0]; const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 'mousemove', { clientX: touch.clientX, clientY: touch.clientY }); callback(mouseEvent); }
+
+        function resizeCanvas() {
+            const rect = wrapper.getBoundingClientRect();
+            const padding = 20;
+            let availableW = Math.floor(rect.width) - padding;
+            let availableH = Math.floor(rect.height) - padding;
+
+            if (state.mode === 'grid' || state.mode === 'geoboard') {
+                const s = config.gridSpacing;
+                const cols = Math.floor(availableW / s);
+                const rows = Math.floor(availableH / s);
+                availableW = cols * s;
+                availableH = rows * s;
+                if (availableW < s) availableW = s;
+                if (availableH < s) availableH = s;
+            } else {
+                 if (availableW % 2 !== 0) availableW--;
+                 if (availableH % 2 !== 0) availableH--;
+            }
+
+            canvas.style.width = availableW + 'px';
+            canvas.style.height = availableH + 'px';
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = availableW * dpr;
+            canvas.height = availableH * dpr;
+            ctx.scale(dpr, dpr);
+            draw();
+        }
+
+        function getPointerPos(e) { const rect = canvas.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
+
+        function getSnapPoint(pos) {
+            if (state.mode === 'blank') return pos;
+            const s = config.gridSpacing;
+            const snapX = Math.round(pos.x / s) * s;
+            const snapY = Math.round(pos.y / s) * s;
+            const dist = Math.sqrt((pos.x - snapX)**2 + (pos.y - snapY)**2);
+            if (dist < config.snapThreshold || state.mode === 'geoboard') return { x: snapX, y: snapY, snapped: true };
+            return pos;
+        }
+
+        function showToast(msg) { toastEl.innerText = msg; toastEl.style.opacity = '1'; setTimeout(() => toastEl.style.opacity = '0', 2000); }
+
+        // --- 核心互動邏輯 ---
+        function onPointerDown(e) {
+            if (state.tool === 'text' && inputContainer.style.display === 'block') return;
+
+            const rawPos = getPointerPos(e);
+            const snappedPos = getSnapPoint(rawPos);
+            state.pointerPos = rawPos;
+
+            if (state.tool === 'select') {
+                if (state.selection.index !== -1 && checkResizeHandle(rawPos)) return;
+
+                const hitText = findClickedLabel(rawPos);
+                if (hitText !== -1) { selectObject('label', hitText, rawPos); return; }
+
+                const hitAngle = findClickedAngle(rawPos);
+                if (hitAngle !== -1) {
+                    if (state.selection.type === 'angle' && state.selection.index === hitAngle) toggleAngleStyle(hitAngle);
+                    else selectObject('angle', hitAngle, rawPos);
+                    return;
+                }
+
+                const hitLine = findClickedLine(rawPos);
+                if (hitLine.index !== -1) {
+                    selectObject('line', hitLine.index, rawPos, hitLine.subtype);
+                    return;
+                }
+
+                if (state.selection.index !== -1) { deselect(); draw(); return; }
+                return;
+            }
+
+            if (state.selection.index !== -1) { deselect(); draw(); }
+
+            if (state.tool === 'text') { showTextInput(rawPos.x, rawPos.y); return; }
+
+            state.startPoint = snappedPos;
+            state.currentPoint = snappedPos;
+
+            if (state.tool === 'pen') state.isDrawing = true;
+            else if (state.tool === 'poly') {
+                state.polyPoints.push(snappedPos);
+                if (state.polyPoints.length > 2) {
+                    const first = state.polyPoints[0];
+                    if (snappedPos.x === first.x && snappedPos.y === first.y) finishPoly();
+                }
+            } 
+            else if (state.tool === 'angle') handleAngleClick(snappedPos);
+            else if (state.tool === 'eraser') {
+                state.isDrawing = true;
+                if (state.hoveredObject) deleteObject(state.hoveredObject);
+            }
+            
+            draw();
+        }
+
+        function onPointerMove(e) {
+            const rawPos = getPointerPos(e);
+            state.pointerPos = rawPos;
+            state.currentPoint = getSnapPoint(rawPos);
+
+            if (state.selection.isResizing) { handleResize(rawPos); return; }
+            if (state.selection.isDragging) { handleDrag(rawPos); return; }
+
+            // 游標邏輯
+            canvas.className = ''; 
+            canvas.style.cursor = 'crosshair';
+
+            if (state.tool === 'select') {
+                canvas.style.cursor = 'default';
+                if (state.selection.index !== -1 && checkResizeHandleHover(rawPos)) canvas.style.cursor = 'pointer';
+                else if (checkObjectHover(rawPos)) canvas.style.cursor = 'move';
+            } else if (state.tool === 'eraser') {
+                canvas.className = 'cursor-eraser';
+            }
+
+            if (state.tool === 'eraser') {
+                findHoverObject(rawPos);
+                if (state.isDrawing && state.hoveredObject) deleteObject(state.hoveredObject);
+            }
+            draw();
+        }
+
+        function onPointerUp(e) {
+            if (state.selection.isDragging || state.selection.isResizing) {
+                state.selection.isDragging = false; state.selection.isResizing = false;
+                saveHistory(); draw(); return;
+            }
+
+            if (state.tool === 'pen' && state.isDrawing) {
+                if (state.startPoint.x !== state.currentPoint.x || state.startPoint.y !== state.currentPoint.y) {
+                    state.lines.push({
+                        type: 'line', p1: {...state.startPoint}, p2: {...state.currentPoint},
+                        color: state.color, width: state.width, dashed: state.isDashed
+                    });
+                    saveHistory();
+                }
+                state.isDrawing = false;
+            } else if (state.tool === 'eraser') {
+                state.isDrawing = false; saveHistory();
+            }
+            draw();
+        }
+
+        // --- 選取與物件 ---
+        function selectObject(type, index, pos, subtype=null) {
+            state.selection.type = type; state.selection.index = index; state.selection.isDragging = true;
+            state.selection.startPos = pos;
+            state.selection.subtype = subtype; 
+            
+            if (type === 'label') {
+                const l = state.labels[index]; state.selection.itemStartPos = { x: l.x, y: l.y };
+            } else if (type === 'angle') {
+                const ang = state.angles[index];
+                if (!ang.textOffset) ang.textOffset = {x: 0, y: 0};
+                state.selection.itemStartPos = { ...ang.textOffset };
+            } else if (type === 'line') {
+                const line = state.lines[index];
+                state.selection.lineStartP1 = { ...line.p1 };
+                state.selection.lineStartP2 = { ...line.p2 };
+                if (subtype === 'p1' || subtype === 'p2') {
+                    state.selection.isResizing = true; 
+                    state.selection.isDragging = false;
+                } else {
+                    state.selection.isDragging = true;
+                }
+            }
+            draw();
+        }
+
+        function deselect() { state.selection = { type: null, index: -1, isDragging: false, isResizing: false }; }
+
+        function deleteSelected() {
+            if (state.selection.type === 'label') state.labels.splice(state.selection.index, 1);
+            else if (state.selection.type === 'angle') state.angles.splice(state.selection.index, 1);
+            else if (state.selection.type === 'line') state.lines.splice(state.selection.index, 1);
+            deselect(); saveHistory(); draw();
+        }
+
+        function checkResizeHandle(pos) {
+            let handlePos = null;
+            if (state.selection.type === 'label') {
+                const l = state.labels[state.selection.index]; const m = measureLabel(l);
+                handlePos = { x: l.x + m.width/2 + 10, y: l.y + m.height/2 + 10 };
+            } else if (state.selection.type === 'angle') {
+                const ang = state.angles[state.selection.index]; const r = ang.radius || 40;
+                const midAngle = getAngleMidDirection(ang);
+                handlePos = { x: ang.p2.x + r * Math.cos(midAngle), y: ang.p2.y + r * Math.sin(midAngle) };
+            } else if (state.selection.type === 'line') {
+                const line = state.lines[state.selection.index];
+                if (Math.hypot(pos.x - line.p1.x, pos.y - line.p1.y) < 15) {
+                    selectObject('line', state.selection.index, pos, 'p1'); return true;
+                }
+                if (Math.hypot(pos.x - line.p2.x, pos.y - line.p2.y) < 15) {
+                    selectObject('line', state.selection.index, pos, 'p2'); return true;
+                }
+                return false;
+            }
+
+            if (handlePos && Math.hypot(pos.x - handlePos.x, pos.y - handlePos.y) < 15) {
+                state.selection.isResizing = true; state.selection.startPos = pos;
+                if (state.selection.type === 'label') {
+                    const l = state.labels[state.selection.index];
+                    state.selection.itemStartDist = Math.hypot(pos.x - l.x, pos.y - l.y); state.selection.itemStartRadius = l.size || 24;
+                } else if (state.selection.type === 'angle') {
+                    const ang = state.angles[state.selection.index];
+                    state.selection.itemStartRadius = ang.radius || 40;
+                    state.selection.itemStartDist = Math.hypot(pos.x - ang.p2.x, pos.y - ang.p2.y);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        function handleResize(pos) {
+            if (state.selection.type === 'label') {
+                const l = state.labels[state.selection.index];
+                const currentDist = Math.hypot(pos.x - l.x, pos.y - l.y);
+                const newSize = state.selection.itemStartRadius * (currentDist / state.selection.itemStartDist);
+                l.size = Math.max(12, Math.min(newSize, 100));
+            } else if (state.selection.type === 'angle') {
+                const ang = state.angles[state.selection.index];
+                const dist = Math.hypot(pos.x - ang.p2.x, pos.y - ang.p2.y);
+                ang.radius = Math.max(20, Math.min(dist, 150));
+            } else if (state.selection.type === 'line') {
+                const snapped = getSnapPoint(pos);
+                const line = state.lines[state.selection.index];
+                
+                let oldPos = null;
+                let newPos = null;
+
+                if (state.selection.subtype === 'p1') {
+                    oldPos = { ...line.p1 };
+                    line.p1.x = snapped.x; line.p1.y = snapped.y;
+                    newPos = { ...line.p1 };
+                } else if (state.selection.subtype === 'p2') {
+                    oldPos = { ...line.p2 };
+                    line.p2.x = snapped.x; line.p2.y = snapped.y;
+                    newPos = { ...line.p2 };
+                }
+                
+                if (oldPos && newPos && (oldPos.x !== newPos.x || oldPos.y !== newPos.y)) {
+                    updateLinkedAngles(oldPos, newPos);
+                }
+            }
+            draw();
+        }
+
+        function handleDrag(pos) {
+            const dx = pos.x - state.selection.startPos.x;
+            const dy = pos.y - state.selection.startPos.y;
+
+            if (state.selection.type === 'label') {
+                const l = state.labels[state.selection.index]; 
+                l.x = state.selection.itemStartPos.x + dx; l.y = state.selection.itemStartPos.y + dy;
+            } else if (state.selection.type === 'angle') {
+                const ang = state.angles[state.selection.index];
+                if (!ang.textOffset) ang.textOffset = {x:0, y:0};
+                ang.textOffset.x = state.selection.itemStartPos.x + dx;
+                ang.textOffset.y = state.selection.itemStartPos.y + dy;
+            } else if (state.selection.type === 'line') {
+                // 修正：計算新的原始座標 (包含 dy)，讓線條可以四處移動
+                const rawNewP1 = { 
+                    x: state.selection.lineStartP1.x + dx, 
+                    y: state.selection.lineStartP1.y + dy 
+                };
+                const snappedP1 = getSnapPoint(rawNewP1);
+                
+                // 計算吸附後的位移量
+                const finalDx = snappedP1.x - state.selection.lineStartP1.x;
+                const finalDy = snappedP1.y - state.selection.lineStartP1.y;
+                
+                const line = state.lines[state.selection.index];
+                const oldP1 = { ...line.p1 };
+                const oldP2 = { ...line.p2 };
+
+                line.p1.x = state.selection.lineStartP1.x + finalDx;
+                line.p1.y = state.selection.lineStartP1.y + finalDy;
+                line.p2.x = state.selection.lineStartP2.x + finalDx;
+                line.p2.y = state.selection.lineStartP2.y + finalDy;
+
+                if (oldP1.x !== line.p1.x || oldP1.y !== line.p1.y) updateLinkedAngles(oldP1, line.p1);
+                if (oldP2.x !== line.p2.x || oldP2.y !== line.p2.y) updateLinkedAngles(oldP2, line.p2);
+            }
+            draw();
+        }
+
+        function updateLinkedAngles(oldPos, newPos) {
+            const epsilon = 0.1; 
+            state.angles.forEach(ang => {
+                let isModified = false;
+                if (Math.abs(ang.p1.x - oldPos.x) < epsilon && Math.abs(ang.p1.y - oldPos.y) < epsilon) {
+                    ang.p1 = { ...newPos }; isModified = true;
+                }
+                if (Math.abs(ang.p2.x - oldPos.x) < epsilon && Math.abs(ang.p2.y - oldPos.y) < epsilon) {
+                    ang.p2 = { ...newPos }; isModified = true;
+                }
+                if (Math.abs(ang.p3.x - oldPos.x) < epsilon && Math.abs(ang.p3.y - oldPos.y) < epsilon) {
+                    ang.p3 = { ...newPos }; isModified = true;
+                }
+                if (isModified) {
+                    const deg = calculateDegrees(ang);
+                    const isRight = Math.abs(deg - 90) < 3;
+                    if (isRight && ang.style === 'arc') ang.style = 'square';
+                    if (!isRight && ang.style === 'square') ang.style = 'arc';
+                }
+            });
+        }
+
+        function checkResizeHandleHover(pos) { return false; } 
+        function checkObjectHover(pos) {
+            if (findClickedLabel(pos) !== -1) return true;
+            if (findClickedAngle(pos) !== -1) return true;
+            if (findClickedLine(pos).index !== -1) return true;
+            return false;
+        }
+
+        // --- 角度邏輯 ---
+        function handleAngleClick(pos) {
+            state.anglePoints.push(pos);
+            state.angleStep++;
+            if (state.angleStep === 1) angleStepText.innerText = "請點擊頂點 (中心)";
+            else if (state.angleStep === 2) angleStepText.innerText = "請點擊另一個側邊點";
+            else if (state.angleStep === 3) {
+                // Creation: Auto-detect 90
+                const tempAng = { p1: state.anglePoints[0], p2: state.anglePoints[1], p3: state.anglePoints[2] };
+                const deg = calculateDegrees(tempAng);
+                const style = Math.abs(deg - 90) < 3 ? 'square' : 'arc';
+                
+                state.angles.push({
+                    type: 'angle', p1: state.anglePoints[0], p2: state.anglePoints[1], p3: state.anglePoints[2],
+                    color: state.color, width: state.width, style: style, radius: 40, textOffset: {x: 0, y: 0}
+                });
+                saveHistory(); resetAngleTool();
+            }
+        }
+
+        function findClickedAngle(pos) {
+            for (let i = state.angles.length - 1; i >= 0; i--) {
+                const ang = state.angles[i]; 
+                if (!isAngleFormed(ang)) continue; // Skip hidden angles
+                const r = ang.radius || 40;
+                const dist = Math.hypot(pos.x - ang.p2.x, pos.y - ang.p2.y);
+                if (ang.style === 'square') { if (dist > 10 && dist < 32) return i; } 
+                else { if (dist > r - 8 && dist < r + 8) return i; }
+            }
+            return -1;
+        }
+
+        function toggleAngleStyle(index) {
+            const angle = state.angles[index];
+            const deg = calculateDegrees(angle);
+            const isRight = Math.abs(deg - 90) < 3;
+
+            if (angle.style === 'square') {
+                angle.style = 'arc';
+            } else if (angle.style === 'arc') {
+                angle.style = 'reflex';
+            } else if (angle.style === 'reflex') {
+                // Cycle back to Square if 90, else Arc
+                if (isRight) angle.style = 'square'; else angle.style = 'arc';
+            }
+            showToast(getAngleStyleName(angle.style)); saveHistory(); draw();
+        }
+        
+        function getAngleMidDirection(ang) {
+            const a1 = Math.atan2(ang.p1.y - ang.p2.y, ang.p1.x - ang.p2.x);
+            const a2 = Math.atan2(ang.p3.y - ang.p2.y, ang.p3.x - ang.p2.x);
+            let mid = (a1 + a2) / 2;
+            if (calculateDirection(a1, a2)) mid += Math.PI;
+            if (ang.style === 'reflex') mid += Math.PI;
+            return mid;
+        }
+        
+        function getAngleStyleName(style) {
+            if (style === 'square') return '直角模式'; if (style === 'reflex') return '反角 (外角)'; return '一般角度';
+        }
+
+        function resetAngleTool() {
+            state.anglePoints = []; state.angleStep = 0;
+            angleStepText.innerText = "請點擊第一個點 (側邊)";
+            if(state.tool === 'angle') angleInstrEl.classList.remove('hidden'); else angleInstrEl.classList.add('hidden');
+        }
+
+        // --- Helper: Check if angle lines exist ---
+        function isAngleFormed(ang) {
+            const hasLine1 = isLineConnecting(ang.p2, ang.p1);
+            const hasLine2 = isLineConnecting(ang.p2, ang.p3);
+            return hasLine1 && hasLine2;
+        }
+
+        function isLineConnecting(pA, pB) {
+            const epsilon = 1;
+            return state.lines.some(l => {
+                const match1 = (Math.abs(l.p1.x - pA.x) < epsilon && Math.abs(l.p1.y - pA.y) < epsilon &&
+                                Math.abs(l.p2.x - pB.x) < epsilon && Math.abs(l.p2.y - pB.y) < epsilon);
+                const match2 = (Math.abs(l.p1.x - pB.x) < epsilon && Math.abs(l.p1.y - pB.y) < epsilon &&
+                                Math.abs(l.p2.x - pA.x) < epsilon && Math.abs(l.p2.y - pA.y) < epsilon);
+                return match1 || match2;
+            });
+        }
+
+        // --- 文字輸入 ---
+        function showTextInput(x, y) {
+            deselect();
+            inputContainer.style.left = x + 'px'; inputContainer.style.top = y + 'px'; inputContainer.style.display = 'block';
+            inputEl.value = ''; inputEl.style.color = state.color;
+            setTimeout(() => inputEl.focus(), 10);
+            state.textPos = {x, y};
+        }
+
+        function confirmText() {
+            if (inputContainer.style.display === 'none') return;
+            const text = inputEl.value.trim();
+            if (text) {
+                state.labels.push({ type: 'text', text: text, x: state.textPos.x, y: state.textPos.y, color: state.color, size: 24 });
+                saveHistory();
+            }
+            inputContainer.style.display = 'none'; draw();
+        }
+
+        function cancelText() { inputContainer.style.display = 'none'; }
+
+        function insertSymbol(symbol) {
+            const start = inputEl.selectionStart; const end = inputEl.selectionEnd; const text = inputEl.value;
+            inputEl.value = text.substring(0, start) + symbol + text.substring(end);
+            inputEl.selectionStart = inputEl.selectionEnd = start + symbol.length; inputEl.focus(); 
+        }
+
+        // --- 輔助函式 ---
+        function measureLabel(label) {
+            ctx.font = `bold ${label.size || 24}px 'Noto Sans TC'`;
+            const m = ctx.measureText(label.text); return { width: m.width, height: label.size || 24 };
+        }
+
+        function findClickedLabel(pos) {
+            for (let i = state.labels.length - 1; i >= 0; i--) {
+                const label = state.labels[i]; const metrics = measureLabel(label);
+                if (pos.x >= label.x - metrics.width/2 && pos.x <= label.x + metrics.width/2 &&
+                    pos.y >= label.y - metrics.height/2 && pos.y <= label.y + metrics.height/2) return i;
+            }
+            return -1;
+        }
+
+        function findClickedLine(pos) {
+            const threshold = 10;
+            for (let i = state.lines.length - 1; i >= 0; i--) {
+                const line = state.lines[i];
+                if (Math.hypot(pos.x - line.p1.x, pos.y - line.p1.y) < 15) return { index: i, subtype: 'p1' };
+                if (Math.hypot(pos.x - line.p2.x, pos.y - line.p2.y) < 15) return { index: i, subtype: 'p2' };
+            }
+            for (let i = state.lines.length - 1; i >= 0; i--) {
+                const line = state.lines[i];
+                if (pointToLineDist(pos, line.p1, line.p2) < threshold) return { index: i, subtype: 'body' };
+            }
+            return { index: -1, subtype: null };
+        }
+
+        function findHoverObject(pos) {
+            const threshold = 10; state.hoveredObject = null;
+            if (findClickedLabel(pos) !== -1) { state.hoveredObject = { type: 'label', index: findClickedLabel(pos) }; return; }
+            if (findClickedAngle(pos) !== -1) { state.hoveredObject = { type: 'angle', index: findClickedAngle(pos) }; return; }
+            const hitLine = findClickedLine(pos);
+            if (hitLine.index !== -1) { state.hoveredObject = { type: 'line', index: hitLine.index }; return; }
+        }
+
+        function deleteObject(obj) {
+            if (obj.type === 'line') state.lines.splice(obj.index, 1);
+            else if (obj.type === 'label') { state.labels.splice(obj.index, 1); if(state.selection.index === obj.index) deselect(); }
+            else if (obj.type === 'angle') state.angles.splice(obj.index, 1);
+            state.hoveredObject = null;
+        }
+
+        function pointToLineDist(p, v, w) {
+            const l2 = (v.x - w.x)**2 + (v.y - w.y)**2; if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            const proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
+            return Math.hypot(p.x - proj.x, p.y - proj.y);
+        }
+
+        function calculateDegrees(ang) {
+            const p1 = ang.p1, p2 = ang.p2, p3 = ang.p3;
+            const a1 = Math.atan2(p1.y - p2.y, p1.x - p2.x); const a2 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
+            let deg = (a2 - a1) * 180 / Math.PI;
+            let diff = a2 - a1; if (diff < 0) diff += 2 * Math.PI;
+            if (diff > Math.PI) deg = 360 - (diff * 180 / Math.PI); else deg = diff * 180 / Math.PI;
+            return Math.round(deg);
+        }
+        
+        function calculateDirection(a1, a2) {
+            let diff = a2 - a1; if (diff < 0) diff += 2 * Math.PI; return diff > Math.PI;
+        }
+
+        function draw() {
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
+            ctx.clearRect(0, 0, width, height);
+
+            drawGrid(width, height);
+
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            state.lines.forEach((line, index) => {
+                const isHovered = state.tool === 'eraser' && state.hoveredObject?.type === 'line' && state.hoveredObject?.index === index;
+                const isSelected = state.selection.type === 'line' && state.selection.index === index;
+                
+                ctx.beginPath(); ctx.moveTo(line.p1.x, line.p1.y); ctx.lineTo(line.p2.x, line.p2.y);
+                ctx.strokeStyle = isHovered ? '#ef4444' : (isSelected ? '#3b82f6' : line.color); 
+                ctx.lineWidth = (isHovered || isSelected) ? line.width + 2 : line.width;
+                if (line.dashed) ctx.setLineDash([8, 8]); else ctx.setLineDash([]);
+                ctx.stroke(); ctx.setLineDash([]);
+                
+                if (isSelected) {
+                    ctx.fillStyle = '#3b82f6';
+                    drawDot(line.p1.x, line.p1.y, '#3b82f6');
+                    drawDot(line.p2.x, line.p2.y, '#3b82f6');
+                }
+
+                if (state.showMeasures) drawLengthLabel(line.p1, line.p2, line.color);
+            });
+
+            state.angles.forEach((ang, index) => {
+                // Check if angle is formed by existing lines
+                if (!isAngleFormed(ang)) return; 
+
+                const isHovered = state.tool === 'eraser' && state.hoveredObject?.index === index;
+                const isSelected = state.selection.type === 'angle' && state.selection.index === index;
+                drawAngle(ang, isHovered ? '#ef4444' : ang.color, isHovered || isSelected);
+            });
+
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            state.labels.forEach((label, index) => {
+                const isHovered = state.tool === 'eraser' && state.hoveredObject?.index === index;
+                const isSelected = state.selection.type === 'label' && state.selection.index === index;
+                const fontSize = label.size || 24;
+                ctx.font = `bold ${fontSize}px 'Noto Sans TC', sans-serif`;
+                if (isSelected) {
+                    const m = ctx.measureText(label.text); const w = m.width + 20; const h = fontSize + 20;
+                    ctx.save(); ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(label.x - w/2, label.y - h/2, w, h);
+                    ctx.setLineDash([]); ctx.fillStyle = '#3b82f6'; ctx.beginPath();
+                    ctx.arc(label.x + w/2, label.y + h/2, 6, 0, Math.PI*2); ctx.fill();
+                    ctx.restore();
+                }
+                ctx.fillStyle = isHovered ? '#ef4444' : label.color;
+                ctx.strokeStyle = 'white'; ctx.lineWidth = Math.max(2, fontSize/8);
+                ctx.strokeText(label.text, label.x, label.y); ctx.fillText(label.text, label.x, label.y);
+            });
+
+            if (state.tool === 'pen' && state.isDrawing) drawPreviewLine(state.startPoint, state.currentPoint);
+            else if (state.tool === 'poly') {
+                if (state.polyPoints.length > 0) {
+                    ctx.beginPath(); ctx.moveTo(state.polyPoints[0].x, state.polyPoints[0].y);
+                    for (let p of state.polyPoints) ctx.lineTo(p.x, p.y);
+                    if (state.currentPoint) ctx.lineTo(state.currentPoint.x, state.currentPoint.y);
+                    ctx.strokeStyle = state.color; ctx.lineWidth = state.width;
+                    if (state.isDashed) ctx.setLineDash([8, 8]);
+                    ctx.stroke(); ctx.setLineDash([]);
+                    state.polyPoints.forEach(p => drawDot(p.x, p.y));
+                }
+                if (state.currentPoint) drawDot(state.currentPoint.x, state.currentPoint.y, state.color);
+            } else if (state.tool === 'angle') {
+                state.anglePoints.forEach(p => drawDot(p.x, p.y, state.color));
+                if (state.anglePoints.length === 1 && state.currentPoint) {
+                    drawPreviewLine(state.anglePoints[0], state.currentPoint, true);
+                } else if (state.anglePoints.length === 2 && state.currentPoint) {
+                    drawPreviewLine(state.anglePoints[0], state.anglePoints[1], true);
+                    drawPreviewLine(state.anglePoints[1], state.currentPoint, true);
+                    drawAngle({p1: state.anglePoints[0], p2: state.anglePoints[1], p3: state.currentPoint, style: 'arc'}, state.color, false, true);
+                }
+            } else if (state.tool === 'eraser' && state.pointerPos) {
+                // 修正：紅圈跟隨 raw pointerPos，不吸附
+                ctx.beginPath(); ctx.arc(state.pointerPos.x, state.pointerPos.y, 10, 0, Math.PI*2);
+                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.stroke();
+            } else if (state.currentPoint && state.tool !== 'text' && !state.selection.isDragging && !state.selection.isResizing) {
+                // 修正：拖曳時不顯示吸附點
+                drawDot(state.currentPoint.x, state.currentPoint.y, state.color);
+            }
+        }
+
+        function drawGrid(w, h) {
+            ctx.fillStyle = state.gridColor; ctx.strokeStyle = state.gridColor; ctx.lineWidth = 1;
+            if (state.mode === 'grid') {
+                ctx.beginPath();
+                for (let x = 0; x <= w; x += config.gridSpacing) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+                for (let y = 0; y <= h; y += config.gridSpacing) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+                ctx.stroke();
+            } else if (state.mode === 'geoboard') {
+                for (let x = config.gridSpacing; x < w; x += config.gridSpacing) {
+                    for (let y = config.gridSpacing; y < h; y += config.gridSpacing) {
+                        ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+            }
+        }
+
+        function drawAngle(ang, color, highlight, preview=false) {
+            const p1 = ang.p1, p2 = ang.p2, p3 = ang.p3;
+            const style = ang.style || 'arc';
+            const r = ang.radius || 40;
+            const a1 = Math.atan2(p1.y - p2.y, p1.x - p2.x);
+            const a2 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
+            
+            ctx.beginPath();
+            let isClockwise = calculateDirection(a1, a2);
+            let displayDeg = 0;
+
+            if (style === 'square') {
+                const size = 20;
+                const p1x = p2.x + size * Math.cos(a1); const p1y = p2.y + size * Math.sin(a1);
+                const p3x = p2.x + size * Math.cos(a2); const p3y = p2.y + size * Math.sin(a2);
+                const p4x = p1x + (p3x - p2.x); const p4y = p1y + (p3y - p2.y);
+                ctx.moveTo(p1x, p1y); ctx.lineTo(p4x, p4y); ctx.lineTo(p3x, p3y);
+                displayDeg = 90;
+            } else {
+                let start = a1; let end = a2; let anticlockwise = isClockwise;
+                if (style === 'reflex') anticlockwise = !isClockwise;
+                ctx.moveTo(p2.x, p2.y); ctx.arc(p2.x, p2.y, r, start, end, anticlockwise); ctx.closePath();
+                let diff = a2 - a1; if (diff < 0) diff += 2 * Math.PI;
+                let deg = diff * 180 / Math.PI;
+                if (isClockwise) deg = 360 - deg;
+                displayDeg = style === 'reflex' ? 360 - deg : deg;
+            }
+
+            ctx.fillStyle = highlight ? 'rgba(59, 130, 246, 0.2)' : hexToRgba(color, 0.1);
+            if (highlight && state.selection.type === 'angle') ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+            
+            if (style !== 'square') ctx.fill();
+            ctx.strokeStyle = highlight ? '#3b82f6' : color; 
+            ctx.lineWidth = highlight ? 3 : 2; 
+            ctx.stroke();
+
+            if (highlight && !preview) {
+                 const midAngle = getAngleMidDirection(ang);
+                 const hx = p2.x + r * Math.cos(midAngle);
+                 const hy = p2.y + r * Math.sin(midAngle);
+                 ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI*2);
+                 ctx.fillStyle = '#3b82f6'; ctx.fill();
+            }
+
+            if (state.showMeasures || preview || highlight) {
+                let midAngle = (a1 + a2) / 2;
+                if (calculateDirection(a1, a2)) midAngle += Math.PI;
+                if (style === 'reflex') midAngle += Math.PI;
+                const textR = r + 40; 
+                const defX = p2.x + textR * Math.cos(midAngle); const defY = p2.y + textR * Math.sin(midAngle);
+                let textX, textY;
+                if (ang.textOffset && (ang.textOffset.x !== 0 || ang.textOffset.y !== 0)) {
+                     textX = ang.textOffset.x; textY = ang.textOffset.y;
+                } else {
+                     textX = defX; textY = defY;
+                     if(ang.textOffset) { ang.textOffset.x = textX; ang.textOffset.y = textY; }
+                }
+                ctx.font = "bold 14px 'Noto Sans TC'"; ctx.fillStyle = '#1e293b';
+                
+                const degVal = Math.round(displayDeg);
+                let typeStr = "";
+                if(degVal > 0 && degVal < 90) typeStr = "銳角";
+                else if(degVal === 90) typeStr = "直角";
+                else if(degVal > 90 && degVal < 180) typeStr = "鈍角";
+                else if(degVal === 180) typeStr = "平角";
+                else if(degVal > 180 && degVal < 360) typeStr = "反角";
+                else if(degVal === 360 || degVal === 0) typeStr = "周角";
+
+                const labelText = typeStr ? `${degVal}° ${typeStr}` : `${degVal}°`;
+                ctx.fillText(labelText, textX, textY);
+            }
+        }
+
+        function drawLengthLabel(p1, p2, color) {
+            const distPx = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+            const units = (distPx / config.gridSpacing).toFixed(1);
+            const text = units.endsWith('.0') ? units.slice(0, -2) : units;
+            const midX = (p1.x + p2.x) / 2; const midY = (p1.y + p2.y) / 2;
+            ctx.save(); ctx.fillStyle = 'white'; ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.font = "12px sans-serif";
+            const metrics = ctx.measureText(text); const w = metrics.width + 8;
+            ctx.fillRect(midX - w/2, midY - 10, w, 20); ctx.strokeRect(midX - w/2, midY - 10, w, 20);
+            ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, midX, midY);
+            ctx.restore();
+        }
+
+        function drawPreviewLine(p1, p2, light=false) {
+            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = state.color; ctx.lineWidth = light ? 1 : state.width;
+            if (state.isDashed) ctx.setLineDash([8, 8]); else ctx.setLineDash(light ? [4,4] : [5, 5]);
+            ctx.stroke(); ctx.setLineDash([]);
+        }
+
+        function drawDot(x, y, color='white') {
+            ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = '#64748b'; ctx.stroke();
+        }
+
+        function hexToRgba(hex, alpha) {
+            const r = parseInt(hex.slice(1, 3), 16); const g = parseInt(hex.slice(3, 5), 16); const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function setTool(t) {
+            confirmText(); state.tool = t; state.polyPoints = []; resetAngleTool();
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-' + t).classList.add('active');
+            inputContainer.style.display = 'none'; 
+            
+            // 修正：切換工具時重置游標
+            canvas.className = '';
+            
+            draw();
+        }
+
+        function setBoardMode(m) {
+            state.mode = m;
+            ['geoboard', 'grid', 'blank'].forEach(mode => {
+                const btn = document.getElementById('mode-' + mode);
+                btn.className = mode === m 
+                    ? "flex-1 py-1.5 text-xs font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all"
+                    : "flex-1 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all";
+            });
+            resizeCanvas(); 
+        }
+
+        function setColor(btn, color) {
+            confirmText(); state.color = color;
+            if(btn && btn.tagName === 'BUTTON') {
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('ring-2', 'ring-offset-1', 'ring-slate-800'));
+                btn.classList.add('ring-2', 'ring-offset-1', 'ring-slate-800');
+            }
+            if (state.tool === 'eraser') setTool('pen'); draw();
+        }
+
+        function toggleDashed(checked) { state.isDashed = checked; }
+        function setGridColor(color) { state.gridColor = color; draw(); }
+        function toggleMeasure(checked) { state.showMeasures = checked; draw(); }
+
+        function saveHistory() {
+            const snapshot = JSON.stringify({ lines: state.lines, labels: state.labels, angles: state.angles });
+            if (state.history.length > 0 && state.history[state.history.length - 1] === snapshot) return;
+            state.history.push(snapshot);
+            if (state.history.length > 30) state.history.shift();
+        }
+
+        function undo() {
+            confirmText();
+            if (state.history.length > 1) {
+                state.history.pop();
+                const prev = JSON.parse(state.history[state.history.length - 1]);
+                state.lines = prev.lines; state.labels = prev.labels || []; state.angles = prev.angles || [];
+                draw();
+            } else { clearAll(false); }
+        }
+
+        function clearAll(confirmUser = true) {
+            if (!confirmUser || confirm('確定要清除所有內容嗎？')) {
+                state.lines = []; state.labels = []; state.polyPoints = []; state.angles = []; state.history = [];
+                resetAngleTool(); saveHistory(); draw();
+            }
+        }
+
+        function downloadImage() {
+            confirmText(); deselect(); draw();
+            const link = document.createElement('a'); link.download = `geoboard-${Date.now()}.png`;
+            const w = canvas.width; const h = canvas.height;
+            const imageData = ctx.getImageData(0,0,w,h);
+            ctx.globalCompositeOperation = 'destination-over'; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+            link.href = canvas.toDataURL(); link.click();
+            ctx.putImageData(imageData, 0, 0); ctx.globalCompositeOperation = 'source-over';
+        }
+
+        function finishPoly() {
+            if (state.polyPoints.length < 2) { state.polyPoints = []; return; }
+            for (let i = 0; i < state.polyPoints.length - 1; i++) {
+                state.lines.push({
+                    type: 'line', p1: {...state.polyPoints[i]}, p2: {...state.polyPoints[i+1]},
+                    color: state.color, width: state.width, dashed: state.isDashed
+                });
+            }
+            state.polyPoints = []; saveHistory(); draw();
+        }
+
+        function cancelPoly() { state.polyPoints = []; draw(); }
+
+        init();
+    </script>
+</body>
+</html>
