@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>互動平面圖形繪圖板 v4.7</title>
+    <title>互動平面圖形繪圖板 v5.3</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -52,7 +52,6 @@
         .cursor-eraser {
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgba(239, 68, 68, 0.3)" stroke="red" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4" /></svg>') 12 12, auto !important;
         }
-        /* 強制選取工具為標準游標 */
         .cursor-default {
             cursor: default !important;
         }
@@ -60,7 +59,8 @@
         .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col md:flex-row text-slate-700">
+<!-- 修正 1: 使用 h-[100dvh] 和 fixed inset-0 確保在 iPad 上滿版且不亂跑 -->
+<body class="h-[100dvh] w-screen flex flex-col md:flex-row fixed inset-0 text-slate-700">
 
     <!-- 左側工具欄 -->
     <aside class="w-full md:w-80 bg-white border-r border-slate-200 flex flex-col shadow-lg z-20 h-auto md:h-full shrink-0">
@@ -69,7 +69,7 @@
             <h1 class="text-lg font-bold text-blue-900 flex items-center gap-2">
                 <i class="ph ph-polygon text-2xl text-blue-600"></i>
                 幾何繪圖板
-                <span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded ml-1">v4.7</span>
+                <span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded ml-1">v5.3</span>
             </h1>
             <p class="text-xs text-slate-500 mt-1 pl-8">數學幾何教學工具</p>
         </div>
@@ -91,6 +91,14 @@
                     <button id="btn-pen" class="tool-btn active flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50" onclick="setTool('pen')">
                         <i class="ph ph-line-segment text-lg"></i> 單線
                     </button>
+                    <!-- 箭頭工具 -->
+                    <button id="btn-arrow-single" class="tool-btn flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50" onclick="setTool('arrow-single')">
+                        <i class="ph ph-arrow-right text-lg"></i> 單箭頭
+                    </button>
+                    <button id="btn-arrow-double" class="tool-btn flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50" onclick="setTool('arrow-double')">
+                        <i class="ph ph-arrows-horizontal text-lg"></i> 雙箭頭
+                    </button>
+                    
                     <button id="btn-poly" class="tool-btn flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium transition hover:bg-slate-50" onclick="setTool('poly')">
                         <i class="ph ph-polygon text-lg"></i> 連續線
                     </button>
@@ -130,10 +138,13 @@
             <!-- 底板與測量 -->
             <section>
                 <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">底板與測量</h3>
-                <div class="flex bg-slate-100 p-1 rounded-lg mb-3">
-                    <button id="mode-geoboard" onclick="setBoardMode('geoboard')" class="flex-1 py-1.5 text-xs font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all">釘板</button>
-                    <button id="mode-grid" onclick="setBoardMode('grid')" class="flex-1 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all">方格</button>
-                    <button id="mode-blank" onclick="setBoardMode('blank')" class="flex-1 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all">空白</button>
+                <!-- 更新模式按鈕組 -->
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <button id="mode-geoboard" onclick="setBoardMode('geoboard')" class="px-2 py-1.5 text-xs font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all">釘板</button>
+                    <button id="mode-grid" onclick="setBoardMode('grid')" class="px-2 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 bg-white border border-slate-200 transition-all">方格</button>
+                    <!-- 新增三角網 -->
+                    <button id="mode-iso" onclick="setBoardMode('iso')" class="px-2 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 bg-white border border-slate-200 transition-all">三角網</button>
+                    <button id="mode-blank" onclick="setBoardMode('blank')" class="px-2 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 bg-white border border-slate-200 transition-all">空白</button>
                 </div>
                 <div class="grid grid-cols-2 gap-3 mb-3">
                     <div>
@@ -163,6 +174,11 @@
 
         <!-- 底部功能 -->
         <div class="p-4 border-t border-slate-200 bg-slate-50 space-y-2 mt-auto">
+            <!-- 修正 2: 增加「刪除選取」按鈕，解決 iPad 無法按 Delete 鍵的問題 -->
+            <button id="btn-delete-selected" onclick="deleteSelected()" class="w-full mb-2 flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-50 border border-orange-200 text-orange-600 rounded text-sm hover:bg-orange-100 font-medium hidden">
+                <i class="ph ph-trash-simple text-lg"></i> 刪除選取物件
+            </button>
+
             <div class="grid grid-cols-2 gap-2">
                 <button onclick="undo()" class="flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50 font-medium">
                     <i class="ph ph-arrow-u-up-left text-lg"></i> 復原
@@ -171,7 +187,7 @@
                     <i class="ph ph-download-simple text-lg"></i> 存圖
                 </button>
             </div>
-            <button onclick="clearAll()" class="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 border border-red-200 text-red-600 rounded text-sm hover:bg-red-100 font-medium">
+            <button onclick="clearAll()" class="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 border border-red-200 text-red-600 rounded text-sm hover:bg-red-100 font-medium mt-2">
                 <i class="ph ph-trash text-lg"></i> 全部清除
             </button>
         </div>
@@ -204,7 +220,7 @@
             </div>
         </div>
         <p class="text-center text-xs text-slate-400 mt-2">
-            提示：使用「選取工具」來移動線條、縮放角度或編輯文字
+            提示：繪製或移動箭頭時，按住 SHIFT 鍵可開啟智慧吸附 | 內容會自動儲存
         </p>
     </main>
 
@@ -257,6 +273,8 @@
             hoveredObject: null
         };
 
+        const STORAGE_KEY = 'geoboard_v5_data';
+
         const canvas = document.getElementById('mainCanvas');
         const ctx = canvas.getContext('2d');
         const inputEl = document.getElementById('floating-input');
@@ -265,10 +283,13 @@
         const toastEl = document.getElementById('toast');
         const angleInstrEl = document.getElementById('angle-instruction');
         const angleStepText = document.getElementById('angle-step-text');
+        const deleteSelectedBtn = document.getElementById('btn-delete-selected');
 
         function init() {
             const resizeObserver = new ResizeObserver(() => { requestAnimationFrame(resizeCanvas); });
             resizeObserver.observe(wrapper);
+            
+            loadFromStorage();
             resizeCanvas();
 
             canvas.addEventListener('mousedown', onPointerDown);
@@ -283,6 +304,17 @@
                 if (e.key === 'Escape') { cancelPoly(); resetAngleTool(); deselect(); }
                 if (e.key === 'Enter' && state.tool === 'poly') finishPoly();
                 if ((e.key === 'Delete' || e.key === 'Backspace') && state.selection.index !== -1) deleteSelected();
+                
+                if (state.selection.index !== -1 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                    const step = e.shiftKey ? 10 : 2;
+                    let dx = 0, dy = 0;
+                    if (e.key === 'ArrowUp') dy = -step;
+                    if (e.key === 'ArrowDown') dy = step;
+                    if (e.key === 'ArrowLeft') dx = -step;
+                    if (e.key === 'ArrowRight') dx = step;
+                    moveSelectedObject(dx, dy);
+                }
             });
 
             inputEl.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') confirmText(); if (e.key === 'Escape') cancelText(); });
@@ -291,11 +323,68 @@
             document.getElementById('width-slider').addEventListener('input', (e) => { state.width = parseInt(e.target.value); document.getElementById('width-display').innerText = state.width + 'px'; });
             document.getElementById('spacing-slider').addEventListener('input', (e) => { config.gridSpacing = parseInt(e.target.value); resizeCanvas(); });
 
-            saveHistory();
+            if(state.history.length === 0) saveHistory();
             draw();
         }
 
-        function handleTouch(e, callback) { e.preventDefault(); const touch = e.touches[0]; const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 'mousemove', { clientX: touch.clientX, clientY: touch.clientY }); callback(mouseEvent); }
+        function loadFromStorage() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    state.lines = parsed.lines || [];
+                    state.labels = parsed.labels || [];
+                    state.angles = parsed.angles || [];
+                    
+                    if (parsed.config) {
+                        config.gridSpacing = parsed.config.gridSpacing || 100;
+                        document.getElementById('spacing-slider').value = config.gridSpacing;
+                    }
+                    if (parsed.view) {
+                        state.mode = parsed.view.mode || 'geoboard';
+                        state.gridColor = parsed.view.gridColor || '#cbd5e1';
+                        document.getElementById('grid-color-picker').value = state.gridColor;
+                        setBoardMode(state.mode); 
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load storage", e);
+            }
+        }
+
+        function saveHistory() {
+            const snapshot = JSON.stringify({ lines: state.lines, labels: state.labels, angles: state.angles });
+            if (state.history.length > 0 && state.history[state.history.length - 1] === snapshot) return;
+            state.history.push(snapshot);
+            if (state.history.length > 30) state.history.shift();
+            
+            try {
+                const storageData = {
+                    lines: state.lines,
+                    labels: state.labels,
+                    angles: state.angles,
+                    config: { gridSpacing: config.gridSpacing },
+                    view: { mode: state.mode, gridColor: state.gridColor }
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
+            } catch (e) {
+                console.error("Storage failed", e);
+            }
+        }
+
+        function handleTouch(e, callback) { 
+            e.preventDefault(); 
+            const touch = e.touches[0]; 
+            const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 'mousemove', { 
+                clientX: touch.clientX, 
+                clientY: touch.clientY,
+                shiftKey: e.shiftKey,
+                ctrlKey: e.ctrlKey,
+                altKey: e.altKey,
+                metaKey: e.metaKey
+            }); 
+            callback(mouseEvent); 
+        }
 
         function resizeCanvas() {
             const rect = wrapper.getBoundingClientRect();
@@ -311,6 +400,13 @@
                 availableH = rows * s;
                 if (availableW < s) availableW = s;
                 if (availableH < s) availableH = s;
+            } else if (state.mode === 'iso') {
+                const s = config.gridSpacing;
+                const h = s * Math.sqrt(3) / 2;
+                const rows = Math.floor(availableH / h);
+                availableH = rows * h;
+                if (availableW < s) availableW = s;
+                if (availableH < h) availableH = h;
             } else {
                  if (availableW % 2 !== 0) availableW--;
                  if (availableH % 2 !== 0) availableH--;
@@ -329,7 +425,22 @@
 
         function getSnapPoint(pos) {
             if (state.mode === 'blank') return pos;
+            
             const s = config.gridSpacing;
+            
+            if (state.mode === 'iso') {
+                const h = s * Math.sqrt(3) / 2;
+                const row = Math.round(pos.y / h);
+                const offset = (row % 2) !== 0 ? s / 2 : 0;
+                const col = Math.round((pos.x - offset) / s);
+                const snapX = col * s + offset;
+                const snapY = row * h;
+                
+                const dist = Math.hypot(pos.x - snapX, pos.y - snapY);
+                if (dist < config.snapThreshold) return { x: snapX, y: snapY, snapped: true };
+                return pos;
+            }
+
             const snapX = Math.round(pos.x / s) * s;
             const snapY = Math.round(pos.y / s) * s;
             const dist = Math.sqrt((pos.x - snapX)**2 + (pos.y - snapY)**2);
@@ -344,8 +455,28 @@
             if (state.tool === 'text' && inputContainer.style.display === 'block') return;
 
             const rawPos = getPointerPos(e);
-            const snappedPos = getSnapPoint(rawPos);
             state.pointerPos = rawPos;
+            
+            const isArrowTool = ['arrow-single', 'arrow-double'].includes(state.tool);
+            let targetPos;
+            if (isArrowTool) {
+                targetPos = e.shiftKey ? getSnapPoint(rawPos) : rawPos;
+            } else {
+                targetPos = getSnapPoint(rawPos);
+            }
+            const snappedPos = targetPos;
+
+            // 修正 3: 橡皮擦在按下的瞬間就進行檢查與刪除 (適應觸控點擊)
+            if (state.tool === 'eraser') {
+                state.isDrawing = true;
+                // 主動呼叫 findHoverObject 確保在點擊當下能抓到物件
+                findHoverObject(rawPos);
+                if (state.hoveredObject) {
+                    deleteObject(state.hoveredObject);
+                }
+                draw();
+                return;
+            }
 
             if (state.tool === 'select') {
                 if (state.selection.index !== -1 && checkResizeHandle(rawPos)) return;
@@ -377,8 +508,9 @@
             state.startPoint = snappedPos;
             state.currentPoint = snappedPos;
 
-            if (state.tool === 'pen') state.isDrawing = true;
-            else if (state.tool === 'poly') {
+            if (['pen', 'arrow-single', 'arrow-double'].includes(state.tool)) {
+                state.isDrawing = true;
+            } else if (state.tool === 'poly') {
                 state.polyPoints.push(snappedPos);
                 if (state.polyPoints.length > 2) {
                     const first = state.polyPoints[0];
@@ -386,10 +518,6 @@
                 }
             } 
             else if (state.tool === 'angle') handleAngleClick(snappedPos);
-            else if (state.tool === 'eraser') {
-                state.isDrawing = true;
-                if (state.hoveredObject) deleteObject(state.hoveredObject);
-            }
             
             draw();
         }
@@ -397,12 +525,17 @@
         function onPointerMove(e) {
             const rawPos = getPointerPos(e);
             state.pointerPos = rawPos;
-            state.currentPoint = getSnapPoint(rawPos);
+            
+            const isArrowTool = ['arrow-single', 'arrow-double'].includes(state.tool);
+            if (isArrowTool) {
+                state.currentPoint = e.shiftKey ? getSnapPoint(rawPos) : rawPos;
+            } else {
+                state.currentPoint = getSnapPoint(rawPos);
+            }
 
-            if (state.selection.isResizing) { handleResize(rawPos); return; }
-            if (state.selection.isDragging) { handleDrag(rawPos); return; }
+            if (state.selection.isResizing) { handleResize(rawPos, e.shiftKey); return; }
+            if (state.selection.isDragging) { handleDrag(rawPos, e.shiftKey); return; }
 
-            // 游標邏輯
             canvas.className = ''; 
             canvas.style.cursor = 'crosshair';
 
@@ -427,11 +560,16 @@
                 saveHistory(); draw(); return;
             }
 
-            if (state.tool === 'pen' && state.isDrawing) {
+            if (['pen', 'arrow-single', 'arrow-double'].includes(state.tool) && state.isDrawing) {
                 if (state.startPoint.x !== state.currentPoint.x || state.startPoint.y !== state.currentPoint.y) {
+                    let arrowType = 'none';
+                    if (state.tool === 'arrow-single') arrowType = 'single';
+                    else if (state.tool === 'arrow-double') arrowType = 'double';
+
                     state.lines.push({
                         type: 'line', p1: {...state.startPoint}, p2: {...state.currentPoint},
-                        color: state.color, width: state.width, dashed: state.isDashed
+                        color: state.color, width: state.width, dashed: state.isDashed,
+                        arrow: arrowType
                     });
                     saveHistory();
                 }
@@ -439,6 +577,30 @@
             } else if (state.tool === 'eraser') {
                 state.isDrawing = false; saveHistory();
             }
+            draw();
+        }
+
+        // --- 鍵盤移動物件 ---
+        function moveSelectedObject(dx, dy) {
+            if (state.selection.type === 'label') {
+                const l = state.labels[state.selection.index];
+                l.x += dx; l.y += dy;
+            } else if (state.selection.type === 'angle') {
+                const ang = state.angles[state.selection.index];
+                if (!ang.textOffset) ang.textOffset = {x: 0, y: 0};
+                ang.textOffset.x += dx; ang.textOffset.y += dy;
+            } else if (state.selection.type === 'line') {
+                const line = state.lines[state.selection.index];
+                const oldP1 = { ...line.p1 };
+                const oldP2 = { ...line.p2 };
+                
+                line.p1.x += dx; line.p1.y += dy;
+                line.p2.x += dx; line.p2.y += dy;
+                
+                if (oldP1.x !== line.p1.x || oldP1.y !== line.p1.y) updateLinkedAngles(oldP1, line.p1);
+                if (oldP2.x !== line.p2.x || oldP2.y !== line.p2.y) updateLinkedAngles(oldP2, line.p2);
+            }
+            saveHistory();
             draw();
         }
 
@@ -465,10 +627,15 @@
                     state.selection.isDragging = true;
                 }
             }
+            // 更新 UI
+            deleteSelectedBtn.classList.remove('hidden');
             draw();
         }
 
-        function deselect() { state.selection = { type: null, index: -1, isDragging: false, isResizing: false }; }
+        function deselect() { 
+            state.selection = { type: null, index: -1, isDragging: false, isResizing: false }; 
+            deleteSelectedBtn.classList.add('hidden');
+        }
 
         function deleteSelected() {
             if (state.selection.type === 'label') state.labels.splice(state.selection.index, 1);
@@ -512,7 +679,7 @@
             return false;
         }
 
-        function handleResize(pos) {
+        function handleResize(pos, shiftKey) {
             if (state.selection.type === 'label') {
                 const l = state.labels[state.selection.index];
                 const currentDist = Math.hypot(pos.x - l.x, pos.y - l.y);
@@ -523,19 +690,26 @@
                 const dist = Math.hypot(pos.x - ang.p2.x, pos.y - ang.p2.y);
                 ang.radius = Math.max(20, Math.min(dist, 150));
             } else if (state.selection.type === 'line') {
-                const snapped = getSnapPoint(pos);
                 const line = state.lines[state.selection.index];
+                const isArrow = (line.arrow === 'single' || line.arrow === 'double');
+                
+                let targetPos;
+                if (isArrow) {
+                    targetPos = shiftKey ? getSnapPoint(pos) : pos;
+                } else {
+                    targetPos = getSnapPoint(pos);
+                }
                 
                 let oldPos = null;
                 let newPos = null;
 
                 if (state.selection.subtype === 'p1') {
                     oldPos = { ...line.p1 };
-                    line.p1.x = snapped.x; line.p1.y = snapped.y;
+                    line.p1.x = targetPos.x; line.p1.y = targetPos.y;
                     newPos = { ...line.p1 };
                 } else if (state.selection.subtype === 'p2') {
                     oldPos = { ...line.p2 };
-                    line.p2.x = snapped.x; line.p2.y = snapped.y;
+                    line.p2.x = targetPos.x; line.p2.y = targetPos.y;
                     newPos = { ...line.p2 };
                 }
                 
@@ -546,7 +720,7 @@
             draw();
         }
 
-        function handleDrag(pos) {
+        function handleDrag(pos, shiftKey) {
             const dx = pos.x - state.selection.startPos.x;
             const dy = pos.y - state.selection.startPos.y;
 
@@ -559,18 +733,25 @@
                 ang.textOffset.x = state.selection.itemStartPos.x + dx;
                 ang.textOffset.y = state.selection.itemStartPos.y + dy;
             } else if (state.selection.type === 'line') {
-                // 修正：計算新的原始座標 (包含 dy)，讓線條可以四處移動
-                const rawNewP1 = { 
-                    x: state.selection.lineStartP1.x + dx, 
-                    y: state.selection.lineStartP1.y + dy 
-                };
-                const snappedP1 = getSnapPoint(rawNewP1);
-                
-                // 計算吸附後的位移量
-                const finalDx = snappedP1.x - state.selection.lineStartP1.x;
-                const finalDy = snappedP1.y - state.selection.lineStartP1.y;
-                
                 const line = state.lines[state.selection.index];
+                const isArrow = (line.arrow === 'single' || line.arrow === 'double');
+                
+                let finalDx = 0;
+                let finalDy = 0;
+
+                if (isArrow && !shiftKey) {
+                    finalDx = dx;
+                    finalDy = dy;
+                } else {
+                    const rawNewP1 = { 
+                        x: state.selection.lineStartP1.x + dx, 
+                        y: state.selection.lineStartP1.y + dy 
+                    };
+                    const snappedP1 = getSnapPoint(rawNewP1);
+                    finalDx = snappedP1.x - state.selection.lineStartP1.x;
+                    finalDy = snappedP1.y - state.selection.lineStartP1.y;
+                }
+                
                 const oldP1 = { ...line.p1 };
                 const oldP2 = { ...line.p2 };
 
@@ -598,11 +779,9 @@
                 if (Math.abs(ang.p3.x - oldPos.x) < epsilon && Math.abs(ang.p3.y - oldPos.y) < epsilon) {
                     ang.p3 = { ...newPos }; isModified = true;
                 }
-                if (isModified) {
+                if (isModified && ang.style === 'square') {
                     const deg = calculateDegrees(ang);
-                    const isRight = Math.abs(deg - 90) < 3;
-                    if (isRight && ang.style === 'arc') ang.style = 'square';
-                    if (!isRight && ang.style === 'square') ang.style = 'arc';
+                    if (Math.abs(deg - 90) >= 3) ang.style = 'arc';
                 }
             });
         }
@@ -792,6 +971,24 @@
             let diff = a2 - a1; if (diff < 0) diff += 2 * Math.PI; return diff > Math.PI;
         }
 
+        // --- Arrow Drawing Helper ---
+        function drawArrowHead(ctx, x, y, angle, color, width) {
+            const headLen = 15 + width; 
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-headLen, headLen/3);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-headLen, -headLen/3);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+        }
+
         function draw() {
             const width = canvas.width / (window.devicePixelRatio || 1);
             const height = canvas.height / (window.devicePixelRatio || 1);
@@ -810,6 +1007,15 @@
                 if (line.dashed) ctx.setLineDash([8, 8]); else ctx.setLineDash([]);
                 ctx.stroke(); ctx.setLineDash([]);
                 
+                // Draw Arrows
+                const angle = Math.atan2(line.p2.y - line.p1.y, line.p2.x - line.p1.x);
+                if (line.arrow === 'single' || line.arrow === 'double') {
+                    drawArrowHead(ctx, line.p2.x, line.p2.y, angle, ctx.strokeStyle, ctx.lineWidth);
+                }
+                if (line.arrow === 'double') {
+                    drawArrowHead(ctx, line.p1.x, line.p1.y, angle + Math.PI, ctx.strokeStyle, ctx.lineWidth);
+                }
+
                 if (isSelected) {
                     ctx.fillStyle = '#3b82f6';
                     drawDot(line.p1.x, line.p1.y, '#3b82f6');
@@ -847,8 +1053,23 @@
                 ctx.strokeText(label.text, label.x, label.y); ctx.fillText(label.text, label.x, label.y);
             });
 
-            if (state.tool === 'pen' && state.isDrawing) drawPreviewLine(state.startPoint, state.currentPoint);
-            else if (state.tool === 'poly') {
+            // Preview
+            if (['pen', 'arrow-single', 'arrow-double'].includes(state.tool) && state.isDrawing) {
+                // Line Preview
+                ctx.beginPath(); ctx.moveTo(state.startPoint.x, state.startPoint.y); ctx.lineTo(state.currentPoint.x, state.currentPoint.y);
+                ctx.strokeStyle = state.color; ctx.lineWidth = state.width;
+                if (state.isDashed) ctx.setLineDash([8, 8]); else ctx.setLineDash([]);
+                ctx.stroke(); ctx.setLineDash([]);
+                
+                const angle = Math.atan2(state.currentPoint.y - state.startPoint.y, state.currentPoint.x - state.startPoint.x);
+                if (state.tool === 'arrow-single' || state.tool === 'arrow-double') {
+                    drawArrowHead(ctx, state.currentPoint.x, state.currentPoint.y, angle, state.color, state.width);
+                }
+                if (state.tool === 'arrow-double') {
+                    drawArrowHead(ctx, state.startPoint.x, state.startPoint.y, angle + Math.PI, state.color, state.width);
+                }
+
+            } else if (state.tool === 'poly') {
                 if (state.polyPoints.length > 0) {
                     ctx.beginPath(); ctx.moveTo(state.polyPoints[0].x, state.polyPoints[0].y);
                     for (let p of state.polyPoints) ctx.lineTo(p.x, p.y);
@@ -880,7 +1101,65 @@
 
         function drawGrid(w, h) {
             ctx.fillStyle = state.gridColor; ctx.strokeStyle = state.gridColor; ctx.lineWidth = 1;
-            if (state.mode === 'grid') {
+            
+            if (state.mode === 'iso') {
+                // 三角網 (Lines)
+                const s = config.gridSpacing;
+                const hStep = s * Math.sqrt(3) / 2;
+                
+                // Horizontals
+                for (let y = 0; y <= h; y += hStep) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+                }
+                
+                // Diagonals /
+                // Equation: x = (y - c)/sqrt(3) => c = y - sqrt(3)x
+                // We need to cover the grid. 
+                // Let's iterate grid points and draw lines to create the mesh.
+                // A simpler way for full canvas coverage:
+                // Draw lines at 60 deg and 120 deg.
+                // x-intercepts step by s.
+                
+                // 60 deg lines (/)
+                // Start from x-axis
+                for (let x = -h; x < w + h; x += s) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x + h/Math.sqrt(3)*2 * (h/hStep), h); // rough projection
+                    // Better: use geometric construction
+                    // From (x, 0) to (x + w_offset, h)
+                    // Delta X for full height H: H / tan(60) = H / sqrt(3)
+                    // We can just iterate points.
+                }
+                
+                // Re-implementation of ISO Grid using standard lines
+                // Horizontal lines are already drawn.
+                // We need lines at 60 and 120.
+                // Point (x, y) = (col * s + (row%2)*s/2, row * hStep)
+                
+                // Let's just draw lines connecting the dots for robustness
+                const rows = Math.ceil(h / hStep);
+                const cols = Math.ceil(w / s);
+                
+                for (let r = 0; r <= rows; r++) {
+                    const off = (r % 2) * s / 2;
+                    const y = r * hStep;
+                    for (let c = 0; c <= cols; c++) {
+                        const x = c * s + off;
+                        
+                        // Connect to (r+1, c) and (r+1, c-1)?
+                        // Neighbors in next row are at x +/- s/2
+                        
+                        if (r < rows) {
+                            // Diagonal right (down-right)
+                            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + s/2, y + hStep); ctx.stroke();
+                            // Diagonal left (down-left)
+                            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - s/2, y + hStep); ctx.stroke();
+                        }
+                    }
+                }
+                
+            } else if (state.mode === 'grid') {
                 ctx.beginPath();
                 for (let x = 0; x <= w; x += config.gridSpacing) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
                 for (let y = 0; y <= h; y += config.gridSpacing) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
@@ -1009,11 +1288,13 @@
 
         function setBoardMode(m) {
             state.mode = m;
-            ['geoboard', 'grid', 'blank'].forEach(mode => {
+            ['geoboard', 'grid', 'blank', 'iso'].forEach(mode => {
                 const btn = document.getElementById('mode-' + mode);
-                btn.className = mode === m 
-                    ? "flex-1 py-1.5 text-xs font-bold rounded-md bg-white text-blue-600 shadow-sm transition-all"
-                    : "flex-1 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition-all";
+                if (btn) {
+                    btn.className = mode === m 
+                    ? "px-2 py-1.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-sm transition-all" // Active style
+                    : "px-2 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 bg-white border border-slate-200 transition-all"; // Inactive
+                }
             });
             resizeCanvas(); 
         }
@@ -1036,6 +1317,20 @@
             if (state.history.length > 0 && state.history[state.history.length - 1] === snapshot) return;
             state.history.push(snapshot);
             if (state.history.length > 30) state.history.shift();
+            
+            // Save to LocalStorage
+            try {
+                const storageData = {
+                    lines: state.lines,
+                    labels: state.labels,
+                    angles: state.angles,
+                    config: { gridSpacing: config.gridSpacing },
+                    view: { mode: state.mode, gridColor: state.gridColor }
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
+            } catch (e) {
+                console.error("Storage failed", e);
+            }
         }
 
         function undo() {
@@ -1081,5 +1376,4 @@
         init();
     </script>
 </body>
-
 </html>
