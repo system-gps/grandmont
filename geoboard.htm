@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>互動平面圖形繪圖板 v5.3</title>
+    <title>互動平面圖形繪圖板 v5.4 (即時屬性編輯版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -48,10 +48,11 @@
         #floating-input {
             user-select: text;
         }
-        /* 優化後的橡皮擦游標 */
+        /* 優化後的橡皮擦游標：方塊樣式，中心對齊 */
         .cursor-eraser {
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgba(239, 68, 68, 0.3)" stroke="red" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4" /></svg>') 12 12, auto !important;
         }
+        /* 強制選取工具為標準游標 */
         .cursor-default {
             cursor: default !important;
         }
@@ -59,7 +60,6 @@
         .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
     </style>
 </head>
-<!-- 修正 1: 使用 h-[100dvh] 和 fixed inset-0 確保在 iPad 上滿版且不亂跑 -->
 <body class="h-[100dvh] w-screen flex flex-col md:flex-row fixed inset-0 text-slate-700">
 
     <!-- 左側工具欄 -->
@@ -69,7 +69,7 @@
             <h1 class="text-lg font-bold text-blue-900 flex items-center gap-2">
                 <i class="ph ph-polygon text-2xl text-blue-600"></i>
                 幾何繪圖板
-                <span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded ml-1">v5.3</span>
+                <span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded ml-1">v5.4</span>
             </h1>
             <p class="text-xs text-slate-500 mt-1 pl-8">數學幾何教學工具</p>
         </div>
@@ -174,7 +174,6 @@
 
         <!-- 底部功能 -->
         <div class="p-4 border-t border-slate-200 bg-slate-50 space-y-2 mt-auto">
-            <!-- 修正 2: 增加「刪除選取」按鈕，解決 iPad 無法按 Delete 鍵的問題 -->
             <button id="btn-delete-selected" onclick="deleteSelected()" class="w-full mb-2 flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-50 border border-orange-200 text-orange-600 rounded text-sm hover:bg-orange-100 font-medium hidden">
                 <i class="ph ph-trash-simple text-lg"></i> 刪除選取物件
             </button>
@@ -320,7 +319,18 @@
             inputEl.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') confirmText(); if (e.key === 'Escape') cancelText(); });
             inputEl.addEventListener('blur', confirmText);
 
-            document.getElementById('width-slider').addEventListener('input', (e) => { state.width = parseInt(e.target.value); document.getElementById('width-display').innerText = state.width + 'px'; });
+            document.getElementById('width-slider').addEventListener('input', (e) => { 
+                const val = parseInt(e.target.value);
+                state.width = val; 
+                document.getElementById('width-display').innerText = val + 'px'; 
+                
+                // Update selected line/angle width
+                if (state.selection.index !== -1) {
+                    if (state.selection.type === 'line') state.lines[state.selection.index].width = val;
+                    if (state.selection.type === 'angle') state.angles[state.selection.index].width = val;
+                    saveHistory(); draw();
+                }
+            });
             document.getElementById('spacing-slider').addEventListener('input', (e) => { config.gridSpacing = parseInt(e.target.value); resizeCanvas(); });
 
             if(state.history.length === 0) saveHistory();
@@ -466,10 +476,8 @@
             }
             const snappedPos = targetPos;
 
-            // 修正 3: 橡皮擦在按下的瞬間就進行檢查與刪除 (適應觸控點擊)
             if (state.tool === 'eraser') {
                 state.isDrawing = true;
-                // 主動呼叫 findHoverObject 確保在點擊當下能抓到物件
                 findHoverObject(rawPos);
                 if (state.hoveredObject) {
                     deleteObject(state.hoveredObject);
@@ -627,7 +635,6 @@
                     state.selection.isDragging = true;
                 }
             }
-            // 更新 UI
             deleteSelectedBtn.classList.remove('hidden');
             draw();
         }
@@ -801,7 +808,6 @@
             if (state.angleStep === 1) angleStepText.innerText = "請點擊頂點 (中心)";
             else if (state.angleStep === 2) angleStepText.innerText = "請點擊另一個側邊點";
             else if (state.angleStep === 3) {
-                // Creation: Auto-detect 90
                 const tempAng = { p1: state.anglePoints[0], p2: state.anglePoints[1], p3: state.anglePoints[2] };
                 const deg = calculateDegrees(tempAng);
                 const style = Math.abs(deg - 90) < 3 ? 'square' : 'arc';
@@ -836,7 +842,6 @@
             } else if (angle.style === 'arc') {
                 angle.style = 'reflex';
             } else if (angle.style === 'reflex') {
-                // Cycle back to Square if 90, else Arc
                 if (isRight) angle.style = 'square'; else angle.style = 'arc';
             }
             showToast(getAngleStyleName(angle.style)); saveHistory(); draw();
@@ -970,6 +975,17 @@
         function calculateDirection(a1, a2) {
             let diff = a2 - a1; if (diff < 0) diff += 2 * Math.PI; return diff > Math.PI;
         }
+
+        function toggleDashed(checked) {
+            state.isDashed = checked;
+            if (state.selection.index !== -1 && state.selection.type === 'line') {
+                state.lines[state.selection.index].dashed = checked;
+                saveHistory(); draw();
+            }
+        }
+
+        function setGridColor(color) { state.gridColor = color; saveHistory(); draw(); }
+        function toggleMeasure(checked) { state.showMeasures = checked; draw(); }
 
         // --- Arrow Drawing Helper ---
         function drawArrowHead(ctx, x, y, angle, color, width) {
@@ -1113,31 +1129,6 @@
                 }
                 
                 // Diagonals /
-                // Equation: x = (y - c)/sqrt(3) => c = y - sqrt(3)x
-                // We need to cover the grid. 
-                // Let's iterate grid points and draw lines to create the mesh.
-                // A simpler way for full canvas coverage:
-                // Draw lines at 60 deg and 120 deg.
-                // x-intercepts step by s.
-                
-                // 60 deg lines (/)
-                // Start from x-axis
-                for (let x = -h; x < w + h; x += s) {
-                    ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x + h/Math.sqrt(3)*2 * (h/hStep), h); // rough projection
-                    // Better: use geometric construction
-                    // From (x, 0) to (x + w_offset, h)
-                    // Delta X for full height H: H / tan(60) = H / sqrt(3)
-                    // We can just iterate points.
-                }
-                
-                // Re-implementation of ISO Grid using standard lines
-                // Horizontal lines are already drawn.
-                // We need lines at 60 and 120.
-                // Point (x, y) = (col * s + (row%2)*s/2, row * hStep)
-                
-                // Let's just draw lines connecting the dots for robustness
                 const rows = Math.ceil(h / hStep);
                 const cols = Math.ceil(w / s);
                 
@@ -1146,14 +1137,8 @@
                     const y = r * hStep;
                     for (let c = 0; c <= cols; c++) {
                         const x = c * s + off;
-                        
-                        // Connect to (r+1, c) and (r+1, c-1)?
-                        // Neighbors in next row are at x +/- s/2
-                        
                         if (r < rows) {
-                            // Diagonal right (down-right)
                             ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + s/2, y + hStep); ctx.stroke();
-                            // Diagonal left (down-left)
                             ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - s/2, y + hStep); ctx.stroke();
                         }
                     }
@@ -1305,11 +1290,25 @@
                 document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('ring-2', 'ring-offset-1', 'ring-slate-800'));
                 btn.classList.add('ring-2', 'ring-offset-1', 'ring-slate-800');
             }
+            // Add update to selection
+            if (state.selection.index !== -1) {
+                if (state.selection.type === 'line') state.lines[state.selection.index].color = color;
+                if (state.selection.type === 'angle') state.angles[state.selection.index].color = color;
+                if (state.selection.type === 'label') state.labels[state.selection.index].color = color;
+                saveHistory(); draw();
+            }
             if (state.tool === 'eraser') setTool('pen'); draw();
         }
 
-        function toggleDashed(checked) { state.isDashed = checked; }
-        function setGridColor(color) { state.gridColor = color; draw(); }
+        function toggleDashed(checked) {
+            state.isDashed = checked;
+            if (state.selection.index !== -1 && state.selection.type === 'line') {
+                state.lines[state.selection.index].dashed = checked;
+                saveHistory(); draw();
+            }
+        }
+
+        function setGridColor(color) { state.gridColor = color; saveHistory(); draw(); }
         function toggleMeasure(checked) { state.showMeasures = checked; draw(); }
 
         function saveHistory() {
@@ -1318,7 +1317,6 @@
             state.history.push(snapshot);
             if (state.history.length > 30) state.history.shift();
             
-            // Save to LocalStorage
             try {
                 const storageData = {
                     lines: state.lines,
