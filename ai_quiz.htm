@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 知識小達人 - 互動測驗</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 1.5rem; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); }
+        .option-btn { transition: all 0.2s ease; border: 2px solid #f3f4f6; }
+        .option-btn:hover:not(:disabled) { border-color: #6366f1; background-color: #f5f3ff; }
+        .option-selected { background-color: #4f46e5 !important; color: white !important; border-color: #4f46e5 !important; }
+        select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234f46e5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem; }
+        /* 自定義滾動條樣式 */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-3xl"> <!-- 加寬容器以適應大字體 -->
+        <!-- 開始畫面 -->
+        <div id="start-screen" class="glass-card p-8 text-center">
+            <div class="mb-6 inline-block p-4 bg-indigo-100 rounded-full">
+                <span class="text-5xl">🤖</span>
+            </div>
+            <h1 class="text-3xl font-bold text-indigo-700 mb-6">AI 知識小達人</h1>
+            <p class="text-gray-600 mb-2 font-bold text-lg">本次挑戰共 7 題</p>
+            <p class="text-gray-500 mb-8 text-sm">請選擇班別與姓名開始挑戰</p>
+            
+            <div class="space-y-4 mb-8 text-left max-w-xs mx-auto">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 ml-1 mb-1">班別</label>
+                    <select id="class-select" onchange="quizApp.updateStudentList()" class="w-full p-3 border-2 border-indigo-100 rounded-xl outline-none focus:border-indigo-500 transition text-gray-700 bg-white">
+                        <option value="">-- 請選擇 --</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 ml-1 mb-1">姓名 (學號+姓名)</label>
+                    <select id="student-select" disabled onchange="quizApp.validateStart()" class="w-full p-3 border-2 border-indigo-100 rounded-xl outline-none bg-gray-50 focus:border-indigo-500 transition text-gray-700">
+                        <option value="">請先選擇班別</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button id="start-btn" onclick="quizApp.start()" disabled class="w-full sm:w-auto bg-gray-400 text-white font-bold py-3 px-12 rounded-full text-xl shadow-lg transition duration-300 cursor-not-allowed">進入挑戰</button>
+        </div>
+
+        <!-- 測驗畫面 -->
+        <div id="quiz-screen" class="glass-card p-8 hidden">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <p id="user-info-display" class="text-xs text-indigo-500 font-bold mb-1 uppercase tracking-wider"></p>
+                    <span class="text-lg font-medium text-indigo-600 px-4 py-1 bg-indigo-50 rounded-full border border-indigo-100">
+                        第 <span id="current-index">1</span> / 7 題
+                    </span>
+                    <!-- 難度標籤已移除 -->
+                </div>
+                <div class="w-32 bg-gray-200 rounded-full h-3">
+                    <div id="progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-500" style="width: 14%"></div>
+                </div>
+            </div>
+            
+            <div id="question-container" class="min-h-[280px]">
+                <h2 id="question-text" class="text-2xl font-bold text-gray-800 mb-8 leading-relaxed"></h2>
+                <div id="options-list" class="grid gap-4"></div>
+            </div>
+            
+            <div class="mt-8 flex justify-end">
+                <button id="next-btn" onclick="quizApp.next()" disabled class="bg-gray-400 text-white px-10 py-3 rounded-xl font-bold cursor-not-allowed transition-all transform active:scale-95 shadow-md text-lg">下一題</button>
+            </div>
+        </div>
+
+        <!-- 結果畫面 -->
+        <div id="result-screen" class="glass-card p-8 hidden text-center">
+            <h1 class="text-3xl font-bold text-indigo-700 mb-2">測驗報告書</h1>
+            <p id="report-user-name" class="text-xl font-bold text-gray-700 mb-6"></p>
+            
+            <!-- 分數大圓圈 -->
+            <div class="inline-block p-6 rounded-full bg-indigo-50 mb-6 border-4 border-white shadow-inner">
+                <span id="score-text" class="text-6xl font-black text-indigo-600">0</span>
+                <span class="text-xl text-indigo-400 ml-1">/ 100</span>
+            </div>
+            
+            <!-- 上傳狀態 -->
+            <div id="save-status" class="flex items-center justify-center gap-2 text-sm font-medium text-amber-600 mb-6 bg-amber-50 py-2 px-4 rounded-lg mx-auto max-w-sm">
+                <svg class="animate-spin h-4 w-4 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                正在上傳結果至雲端...
+            </div>
+
+            <!-- 成績詳細內容容器 -->
+            <div id="report-container" class="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar text-left border-t border-gray-100 pt-4">
+                <!-- 1. 直觀總表 (這裡會動態生成) -->
+                <div id="summary-table-container" class="mb-6"></div>
+
+                <!-- 2. 詳細題目回顧 -->
+                <div id="report-details" class="space-y-6"></div>
+            </div>
+            
+            <div class="mt-6 border-t border-gray-100 pt-6">
+                <button onclick="location.reload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-12 rounded-xl shadow-lg transition transform hover:-translate-y-1 text-lg">返回首頁</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const scriptURL = "https://script.google.com/macros/s/AKfycbzCpke8TAq2qp6WaOHIIsSKPkEVXSustE30xZwyDW5jvYyFj1TuTTai0585RXqBFkFk/exec"; 
+
+        const studentRawData = `1A 1 陳熹雋,1A 2 陳意衡,1A 3 陳彥君,1A 4 陳楚皓,1A 5 陳彥羲,1A 6 侯林菲,1A 7 許皓琳,1A 8 黃煜軒,1A 9 關旨荇,1A 10 劉卓瀅,1A 11 劉仲宇,1A 12 羅卓熙,1A 13 李芯悦,1A 14 呂俊霖,1A 15 呂仲軒,1A 16 吳諾兒,1A 17 彭梓悦,1A 18 施鈞源,1A 19 孫子豪,1A 20 曾以仁,1A 21 曹正,1A 22 王天宇,1A 23 王柏諾,1A 24 胡悦翹,1B 1 陳曉瑩,1B 2 陳梓韜,1B 3 陳永昇,1B 4 陳悅心,1B 5 張峻烽,1B 6 蔡宏鑫,1B 7 朱灝喆,1B 8 何允恒,1B 9 韓欣穎,1B 10 叶宇恒,1B 11 江泳琳,1B 12 關明菲,1B 13 鄺雪晴,1B 14 劉芊汝,1B 15 羅復希,1B 16 李俊霆,1B 17 李鎧,1B 18 梁凱淇,1B 19 巫恒逸,1B 20 柯芷晴,1B 21 蘇智泓,1B 22 曾鋭彬,1B 23 尹梓言,1B 24 胡梓榣,1B 25 丘文博,1B 26 朱鑠穎,1C 1 歐陽子朗,1C 2 周柏橋,1C 3 鄭浚東,1C 4 張洛頤,1C 5 張允謙,1C 6 朱善鋐,1C 7 洪永灃,1C 8 葉愷晴,1C 9 江澤楷,1C 10 江泳婷,1C 11 郭曉靜,1C 12 林芊玥,1C 13 劉子儀,1C 14 李卓諾,1C 15 李柏翱,1C 16 梁心巧,1C 17 梁逸熹,1C 18 危逸辰,1C 19 潘承鈞,1C 20 蕭雨彤,1C 21 譚愷瑤,1C 22 譚丞竣,1C 23 田晞潼,1C 24 王樂澄,1C 25 黃子軒,1C 26 王梓然,1C 27 葉芷晴,1D 1 陳振軒,1D 2 陳晞,1D 3 陳柏熹,1D 4 陳宏信,1D 5 張睎童,1D 6 周羲和,1D 7 徐朗睎,1D 8 方俊熹,1D 9 方梓喬,1D 10 江徽,1D 11 郭又嘉,1D 12 劉淳浠,1D 13 梁靖堯,1D 14 李祉諾,1D 15 林詩穎,1D 16 廖心瑜,1D 17 盧曉怡,1D 18 顏孝善,1D 19 鄧先喻,1D 20 鄧芷珺,1D 21 謝泓泰,1D 22 童衍嘉,1D 23 黃煦昡,1D 24 吳嘉鋭,1D 25 楊善雯,1D 26 姚芊語,1E 1 陳希霖,1E 2 陳晞瑜,1E 3 陳君業,1E 4 陳溰琳,1E 5 陳星宇,1E 6 鄭子榆,1E 7 馮晞童,1E 8 何鉦霆,1E 9 許正翹,1E 10 郭柏希,1E 11 郭柏喬,1E 12 林嘉慧,1E 13 羅敏芫,1E 14 梁天豪,1E 15 連尉𧧽,1E 16 盧心怡,1E 17 勞以曈,1E 18 莫彥博,1E 19 潘柏皓,1E 20 鄧雨晴,1E 21 蔡竣軒,1E 22 黃晉謙,1E 23 黃詩淇,1E 24 胡凱藍,1E 25 顏嘉希,1E 26 楊樂軒,2A 1 陳信希,2A 2 陳宥銘,2A 3 鄒嘉柔,2A 4 鄭雅之,2A 5 張予寧,2A 6 馮朗華,2A 7 何旻蔚,2A 8 何梓嫣,2A 9 許若楠,2A 10 林捷然,2A 11 林陽曦,2A 12 李卓斐,2A 13 梁昊,2A 14 梁凱媃,2A 15 廖凱漩,2A 16 勞君婷,2A 17 馬鉦博,2A 18 伍灝然,2A 19 蕭玥呈,2A 20 曾恩陶,2A 21 王祐辰,2A 22 黃玳嘉,2A 23 黃彥熹,2A 24 楊旻彧,2A 25 葉芷藴,2B 1 陳雋禮,2B 2 陳柏霖,2B 3 陳瑋楠,2B 4 陳穎澄,2B 5 鄭皓文,2B 6 張峻僑,2B 7 錢玟謙,2B 8 鍾振耀,2B 9 何籽齊,2B 10 何芷奷,2B 11 林允兒,2B 12 劉星宇,2B 13 李晞雒,2B 14 李芯潁,2B 15 梁雅兒,2B 16 梁心怡,2B 17 盧靖方,2B 18 麥雅淇,2B 19 吳家賢,2B 20 孫鎧霖,2B 21 曾夢歡,2B 22 黃梓朗,2B 23 謝樂懿,2B 24 嚴敏瑜,2B 25 余芊潼,2C 1 陳家博,2C 2 陳佰僑,2C 3 陳楚伊,2C 4 鄭懿睿,2C 5 張芷僑,2C 6 張日曦,2C 7 蔡子言,2C 8 朱晉賢,2C 9 朱詠珊,2C 10 鍾禮賢,2C 11 侯佩兒,2C 12 管諾賢,2C 13 郭昊洋,2C 14 黎子謙,2C 15 劉昊均,2C 16 劉浚鋐,2C 17 李諾頤,2C 18 梁琋雯,2C 19 林新珊,2C 20 劉梓潼,2C 21 吳綽瀅,2C 22 譚紫寧,2C 23 王羨妤,2C 24 黃庭謙,2C 25 鍾浩鈱,2D 1 區晉樑,2D 2 陳瀞希,2D 3 陳凱淳,2D 4 陳鎧賢,2D 5 張鈞琳,2D 6 馮凱琳,2D 7 林雅雯,2D 8 林蔣沂,2D 9 劉玥澄,2D 10 羅浩言,2D 11 李溵喬,2D 12 梁澤仁,2D 13 李靖頤,2D 14 林烱烽,2D 15 呂綽瑤,2D 16 毛羿巽,2D 17 吳憲峰,2D 18 石芮霖,2D 19 曾禮賢,2D 20 王儒悦,2D 21 胡錦天,2D 22 王暟瞳,2D 23 胡梓筠,2D 24 伍彥潮,2D 25 余思穎,2E 1 歐希彤,2E 2 陳梓昊,2E 3 陳芷琳,2E 4 張司宇,2E 5 張煒傑,2E 6 張恩僑,2E 7 趙浩軒,2E 8 戴嘉瑩,2E 9 嚴崇灝,2E 10 葉文晞,2E 11 黎爾澄,2E 12 黎爾謙,2E 13 梁栢睿,2E 14 李依娜,2E 15 連珝㞩,2E 16 巫倬鋒,2E 17 戴晞然,2E 18 譚竣軒,2E 19 鄧康瑤,2E 20 黃千睿,2E 21 黃寶儀,2E 22 黃梓謙,2E 23 吳妤諳,2E 24 葉美琳,2E 25 朱晨曦,3A 1 陳家淳,3A 2 張薾晨,3A 3 張景軒,3A 4 何沛靈,3A 5 何韻瀅,3A 6 關羨錤,3A 7 林善瑩,3A 8 李朗棋,3A 9 李庭欣,3A 10 梁可榆,3A 11 林雅婷,3A 12 吳智琛,3A 13 吳愷恩,3A 14 吳葉恆,3A 15 歐航瑋,3A 16 蘇逸朗,3A 17 施善文,3A 18 唐婉宜,3A 19 曾卓謙,3A 20 黃頌謙,3A 21 王煦霖,3A 22 黃贊殷,3A 23 黃一陽,3A 24 胡蓁翹,3A 25 余沛凝,3B 1 陳浠婷,3B 2 陳灝斌,3B 3 張樾,3B 4 蔡海澄,3B 5 周望舒,3B 6 鄧渲穎,3B 7 熊梓喬,3B 8 關詠琳,3B 9 黎熙桐,3B 10 林柏宇,3B 11 劉瀰,3B 12 劉柏希,3B 13 梁語軒,3B 14 馬熙雯,3B 15 吳思言,3B 16 彭映雪,3B 17 潘朗楷,3B 18 黃覓颻,3B 19 黃小洹,3B 20 黃天信,3B 21 王梓謙,3B 22 王梓穎,3B 23 胡凱澄,3B 24 邱彥楟,3B 25 葉栢廷,3C 1 陳逸朗,3C 2 張允嵐,3C 3 莊鎧溢,3C 4 馮卓賢,3C 5 郭睿捷,3C 6 簡芷桐,3C 7 林善晴,3C 8 林紫堯,3C 9 劉睿軒,3C 10 李祉誼,3C 11 連信言,3C 12 廖望正,3C 13 羅啟晉,3C 14 蕭梓淇,3C 15 孫苡澄,3C 16 施靜嵐,3C 17 鄧允然,3C 18 曾天佑,3C 19 王煦霆,3C 20 黃家熙,3C 21 胡善之,3C 22 楊樂昕,3C 23 葉愷晴,3C 24 葉蘊瑤,3C 25 庾凱舒,3D 1 陳晉燊,3D 2 陳思霖,3D 3 鍾俊賢,3D 4 戴沛銘,3D 5 何韻妍,3D 6 黎允皓,3D 7 黎昕潼,3D 8 林心賢,3D 9 李紫盈,3D 10 梁澤栩,3D 11 梁詩諾,3D 12 梁圓圓,3D 13 連家晴,3D 14 林晴嵐,3D 15 陸穎琳,3D 16 龍允澄,3D 17 顏沛怡,3D 18 潘景康,3D 19 潘睿晞,3D 20 施澤仁,3D 21 戴焯言,3D 22 杜國維,3D 23 黃子俊,3D 24 楊靖泓,3D 25 楊心蕊,3E 1 查奕森,3E 2 陳詠芯,3E 3 陳殷霆,3E 4 陳雨晴,3E 5 周穎熙,3E 6 鄭芷瀅,3E 7 張閔程,3E 8 霍柏彥,3E 9 葉亦翔,3E 10 黎昕澄,3E 11 利卓羽,3E 12 李芊澄,3E 13 梁卓謙,3E 14 李俊賢,3E 15 李凱澄,3E 16 羅德蔚,3E 17 吳泳姸,3E 18 潘承耀,3E 19 譚沛林,3E 20 黃頌然,3E 21 胡旻慧,3E 22 胡嘉濠,3E 23 楊靖,3E 24 鄭雅予,4A 1 陳卓瑩,4A 2 陳信佑,4A 3 陳靖欣,4A 4 鄭多宏,4A 5 張綽祐,4A 6 朱沛翹,4A 7 方梓晴,4A 8 康柏熙,4A 9 許珮筠,4A 10 許紫桐,4A 11 洪鎮堯,4A 12 簡希而,4A 13 林泳桐,4A 14 李淽玥,4A 15 李廷熙,4A 16 梁家浠,4A 17 陸思慧,4A 18 梁澤琛,4A 19 麥梓琳,4A 20 吳子睿,4A 21 柯溍貽,4A 22 潘奕匡,4A 23 潘奕霖,4A 24 湯梓峰,4A 25 黃知恩,4A 26 黃浚銘,4A 27 吳婧言,4A 28 吳婧煊,4A 29 吳思博,4A 30 余孝賢,4A 31 袁浚熙,4B 1 陳奕廷,4B 2 鄭朗軒,4B 3 張渼偲,4B 4 張子浩,4B 5 賀致堯,4B 6 何旻蒑,4B 7 許皓泓,4B 8 林奕仲,4B 9 林玥瑩,4B 10 劉映汝,4B 11 羅瑋霖,4B 12 李瑋澄,4B 13 梁景熹,4B 14 梁詠欣,4B 15 梁漪桓,4B 16 李樂懿,4B 17 梁恩浠,4B 18 羅鎧晴,4B 19 呂清妍,4B 20 馬昊燊,4B 21 湯鎮銘,4B 22 田晞樂,4B 23 唐嘉禧,4B 24 尹樂恩,4B 25 王梓琪,4B 26 王熙雯,4B 27 王汶僖,4B 28 吳子朗,4B 29 邱家樂,4B 30 邱彥竣,4B 31 楊子渘,4C 1 陳見之,4C 2 陳樂熙,4C 3 錢巧霖,4C 4 蔡清妍,4C 5 蔡焌軒,4C 6 周彥彤,4C 7 關宗灝,4C 8 奚梓麟,4C 9 鄧諾文,4C 10 郭俞彤,4C 11 賴至誠,4C 12 黎祉樂,4C 13 林國言,4C 14 李昕熹,4C 15 梁晞妍,4C 16 梁宇霆,4C 17 吳卓言,4C 18 吳沛珊,4C 19 譚安喬,4C 20 曾宇哲,4C 21 黃寶謙,4C 22 楊心妤,4C 23 楊穎芯,4C 24 楊祐安,4D 1 陳俊凱,4D 2 陳彥彤,4D 3 鄭丞超,4D 4 鄭穎恆,4D 5 張榆澄,4D 6 朱俊朗,4D 7 洪力蔭,4D 8 林泳彤,4D 9 劉芷瑤,4D 10 李洋愷,4D 11 梁芷悠,4D 12 蘇俊皓,4D 13 施明雅,4D 14 戴焯諾,4D 15 譚楚桐,4D 16 湯詠賢,4D 17 曹子玥,4D 18 黃琸舜,4D 19 黃天嵐,4D 20 黃逸翹,4D 21 楊晟軒,4D 22 楊景匡,4D 23 邢維丞,4D 24 翁奕琳,4E 1 區竣睎,4E 2 陳凱珮,4E 3 陳詩穎,4E 4 陳彥希,4E 5 鄒家謙,4E 6 鄭子諾,4E 7 張浚杭,4E 8 何敏嘉,4E 9 羅卓謙,4E 10 盧佳琪,4E 11 伍偉庭,4E 12 柯鈞諾,4E 13 潘英貴,4E 14 蘇凱潼,4E 15 謝心弦,4E 16 黃嘉欣,4E 17 黃柏陶,4E 18 黃梓晴,4E 19 黃子誠,4E 20 吳思橋,5A 1 陳頌錡,5A 2 陳淏揚,5A 3 陳滶銘,5A 4 陳思羽,5A 5 鄭婥妤,5A 6 趙恩彤,5A 7 曹子錀,5A 8 蔡子瑩,5A 9 何思齊,5A 10 郭靜瑩,5A 11 郭幸兒,5A 12 郭君睿,5A 13 林迪文,5A 14 梁卓然,5A 15 李顯揚,5A 16 李星慧,5A 17 羅泳雅,5A 18 盧妍孜,5A 19 呂洛恒,5A 20 馬曉晴,5A 21 馬梓崴,5A 22 歐恩貝,5A 23 邱芊羽,5A 24 譚知行,5A 25 鄧司鉉,5A 26 曾靖嵐,5A 27 曾柏軒,5A 28 吳金麟,5A 29 胡定駱,5A 30 楊玥瑩,5A 31 翁浚皓,5A 32 張銘曉,5B 1 陳子悠,5B 2 周雋希,5B 3 鄭儲邦,5B 4 莊浠瑩,5B 5 夏子弘,5B 6 賀子宸,5B 7 許峻灝,5B 8 林浩軒,5B 9 林嘉敏,5B 10 李卓珈,5B 11 李俊逸,5B 12 李朗達,5B 13 李宇謙,5B 14 李加敏,5B 15 李允捷,5B 16 廖幸兒,5B 17 劉可兒,5B 18 吳朗瑜,5B 19 伍慧珊,5B 20 岑可翹,5B 21 孫銘浠,5B 22 譚棨燊,5B 23 譚應軒,5B 24 曾慶洛,5B 25 黃卓妤,5B 26 黃承晞,5B 27 黃梓欣,5B 28 黃詠心,5B 29 袁崇曦,5B 30 周梓瑜,5C 1 陳熹姸,5C 2 陳瑋灝,5C 3 陳昱霖,5C 4 鄭哲,5C 5 張嘉妤,5C 6 鄒卓喬,5C 7 鄺可喬,5C 8 黎凱甄,5C 9 黎子鏗,5C 10 林思彤,5C 11 劉佩祺,5C 12 劉芷萱,5C 13 李思瑤,5C 14 盧鴻宇,5C 15 盧思羽,5C 16 曾瀚賢,5C 17 徐羨喬,5C 18 黃琸堯,5C 19 黃芯諾,5C 20 黃維博,5C 21 黃雨桐,5C 22 胡啓湸,5C 23 胡倩瑋,5C 24 楊舜之,5D 1 陳凱恩,5D 2 陳立喬,5D 3 陳敏軒,5D 4 陳茂凱,5D 5 鄭奕飛,5D 6 錢凱晴,5D 7 蔡俊添,5D 8 周青陽,5D 9 周瑞蕎,5D 10 鍾禮謙,5D 11 戴嘉禧,5D 12 何靖喬,5D 13 何芷源,5D 14 郭臨,5D 15 林家而,5D 16 林健銘,5D 17 李卓穎,5D 18 李凱宇,5D 19 馬綽嬣,5D 20 馬琝傑,5D 21 馬恩悦,5D 22 莫梓妤,5D 23 吳芷盈,5D 24 伍思妍,5D 25 葉思朗,5D 26 楊若萱,5E 1 陳駿豪,5E 2 陳芝敏,5E 3 張怡禎,5E 4 張怡萱,5E 5 蔡卓翹,5E 6 方栢宇,5E 7 符碩軒,5E 8 何家瑩,5E 9 黃健彬,5E 10 許悅,5E 11 林思辰,5E 12 林禹軒,5E 13 羅婉瑩,5E 14 李翊行,5E 15 梁心盈,5E 16 李姵賢,5E 17 麥俊仁,5E 18 譚暘霖,5E 19 黃晉熹,5E 20 王晧恩,5E 21 邱炫智,5E 22 楊浩程,6A 1 陳泓俊,6A 2 陳思成,6A 3 張綽軒,6A 4 張筱攸,6A 5 程頌兒,6A 6 周芷萱,6A 7 周子祐,6A 8 馮智譽,6A 9 許樂媛,6A 10 許心淇,6A 11 洪巧恩,6A 12 龔均曈,6A 13 黎鐘澤,6A 14 賴家敏,6A 15 黎子芊,6A 16 黎子萱,6A 17 劉天溵,6A 18 梁晨,6A 19 梁詠嵐,6A 20 李俊禧,6A 21 李樂怡,6A 22 林煇皓,6A 23 廖望哲,6A 24 吳承熹,6A 25 潘茵彤,6A 26 蕭梓諾,6A 27 蕭仲言,6A 28 施瀛鈞,6A 29 鄧旨峻,6A 30 黃卓文,6A 31 黃苡喬,6A 32 吳子君,6A 33 鄭力中,6B 1 區永揚,6B 2 陳宏瑋,6B 3 張浚一,6B 4 張駿朗,6B 5 張凱晴,6B 6 張凱喬,6B 7 張梓淳,6B 8 張芷熒,6B 9 蔡卓侖,6B 10 鍾希兒,6B 11 方心頤,6B 12 何沛陞,6B 13 葉景軒,6B 14 郭千琬,6B 15 郭倚彤,6B 16 林樂恩,6B 17 劉康佑,6B 18 李曉琳,6B 19 李瀚泓,6B 20 林奕澍,6B 21 羅琸嵐,6B 22 龍洛蜂,6B 23 曾梓傑,6B 24 蔡永匡,6B 25 尹佟恩,6B 26 黃希瞳,6B 27 黃可頤,6B 28 黃贊臣,6B 29 黃偉睿,6B 30 吳璟悠,6C 1 陳鎧廷,6C 2 陳欣彤,6C 3 周啟豪,6C 4 鄭凱沂,6C 5 張梓烽,6C 6 趙梓希,6C 7 趙慧喬,6C 8 許願,6C 9 林汶進,6C 10 羅嘉悠,6C 11 李智庭,6C 12 梁雲姿,6C 13 李芊慧,6C 14 羅曦婷,6C 15 伍君昊,6C 16 鄧鈞朗,6C 17 黃駿佑,6C 18 黃思澄,6C 19 吳政鋭,6C 20 袁凱霖,6C 21 翁奕熙,6D 1 陳芷瑜,6D 2 張浩揚,6D 3 張晨曦,6D 4 張映澄,6D 5 鄒本騫,6D 6 鍾峻熙,6D 7 柯繼然,6D 8 江俊曦,6D 9 郭甯,6D 10 林昱丞,6D 11 李湚頤,6D 12 梁文晞,6D 13 李悅曦,6D 14 呂柏軒,6D 15 沙婉如,6D 16 譚紫悦,6D 17 鄧宇政,6D 18 丁健悠,6D 19 董穎天,6D 20 黃健朗,6D 21 胡浚鴻,6E 1 陳倚盈,6E 2 陳宇軒,6E 3 鄭瑞豐,6E 4 張晞瑜,6E 5 張梓希,6E 6 林曉婷,6E 7 林梓慧,6E 8 李承禧,6E 9 李家興,6E 10 林新杰,6E 11 雷梓希,6E 12 吳綽鎧,6E 13 王鳳賢,6E 14 王國南,6E 15 黃致肇,6E 16 黃鎮熙,6E 17 黃振庭,6E 18 楊希昕,6E 19 葉子逸`;
+        
+        // 解析學生資料
+        const students = studentRawData.split(',').map(s => {
+            const parts = s.trim().split(/\s+/);
+            if(parts.length >= 3) {
+                return { cls: parts[0], id: parts[1], name: parts.slice(2).join(' ') };
+            }
+            return null;
+        }).filter(s => s !== null);
+
+        // 題目分級 (level: 'easy' | 'medium' | 'hard')
+        const quizData = [
+            { level: 'easy', q: "什麼是人工智能（AI）？", a: "C", options: { A: "住在電腦裡的小精靈", B: "永遠不會壞掉的機器人", C: "由人類製造，能像人一樣思考和學習的機器", D: "一種不需要插電就能動的玩具" }},
+            { level: 'medium', q: "如果想讓 AI 學會認出「貓咪」，我們應該怎麼做？", a: "D", options: { A: "讀故事書給它聽", B: "帶它去公園散步", C: "給它吃貓餅乾", D: "給它看成千上萬張貓的照片（大數據）" }},
+            { level: 'medium', q: "AI 模仿人類時，具備哪些聰明的過程？", a: "A", options: { A: "推理、自我學習和移動", B: "睡覺、吃飯、玩遊戲", C: "唱歌、跳舞、打球", D: "呼吸、流汗、長高" }},
+            { level: 'medium', q: "手機裡的語音助理能聽懂我們說的話，是利用了什麼技術？", a: "B", options: { A: "魔法感應", B: "自然語言處理（NLP）", C: "讀心術", D: "聲音放大器" }},
+            { level: 'medium', q: "在看影片時，觀察哪一個部位最容易發現 AI 假影片的破綻？", a: "C", options: { A: "衣服的顏色", B: "鞋帶有沒有綁好", C: "手指的數量或奇怪的姿勢", D: "頭髮的長度" }},
+            { level: 'hard', q: "AI 生成的人物「眼睛」，通常看起來會怎樣？", a: "D", options: { A: "像星星一樣閃亮", B: "跟真人一模一樣，完全分不出來", C: "眼睛會發出紅色的光", D: "眼神空洞，或反光點的位置很奇怪" }},
+            { level: 'hard', q: "AI 生成的人物「皮膚」，常常會讓人覺得不自然，原因是？", a: "A", options: { A: "過於平滑，好像沒有毛孔一樣", B: "皮膚上面有太多傷痕", C: "皮膚會像變色龍一樣變色", D: "皮膚太黑了" }},
+            { level: 'medium', q: "影片裡的人說話時，如果嘴型跟聲音對不上，代表什麼？", a: "B", options: { A: "喇叭壞掉了", B: "這可能是一段 AI 偽造的影片（影音不同步）", C: "這個人感冒了，聲音變了", D: "影片播放速度太慢" }},
+            { level: 'hard', q: "如果看到影片裡的「影子」跟太陽的方向不一樣，這說明了？", a: "C", options: { A: "太陽在移動", B: "影子在捉迷藏", C: "這段影片違反了物理規律，可能是 AI 做的", D: "影片拍得太美了" }},
+            { level: 'hard', q: "觀察 AI 影片的「背景」，如果發現文字變得模糊或歪斜，說明？", a: "D", options: { A: "攝影機沒對焦", B: "背景是故意設計的", C: "背景有很多路人", D: "這是 AI 生成背景時常出現的困難點" }},
+            { level: 'easy', q: "什麼標記最容易讓我們一眼看出這是不是 AI 生成的內容？", a: "A", options: { A: "數位浮水印 (Digital Watermark)", B: "影片的檔案大小", C: "螢幕的亮度", D: "影片的總長度" }},
+            { level: 'easy', q: "如果一個帳號在「很短時間內」上傳超多長得非常像的影片，我們該？", a: "B", options: { A: "趕快點讚", B: "保持警惕，這可能是 AI 產出的內容", C: "轉發給所有同學", D: "留言誇獎它很勤勞" }},
+            { level: 'hard', q: "把一個人的「表情」換到另一個人的臉上，是利用哪種技術？", a: "C", options: { A: "影印機技術", B: "自動編碼器（Autoencoder）", C: "3D 列印技術", D: "快速素描" }},
+            { level: 'hard', q: "「生成對抗網絡（GAN）」為什麼能讓假影片變得很逼真？", a: "D", options: { A: "因為它會自動關機", B: "因為它會刪除背景", C: "因為它會自動調色", D: "因為有兩組 AI 互相「競爭」來提升效果" }},
+            { level: 'easy', q: "壞人利用 AI 製作「深偽（Deepfake）」影片，最主要的危害是？", a: "A", options: { A: "散播假消息或欺騙大家", B: "讓網路變慢", C: "讓電腦中毒", D: "讓螢幕變黑" }},
+            { level: 'easy', q: "看到來源不明的 AI 假影片，我們不應該做什麼？", a: "B", options: { A: "告訴爸爸媽媽", B: "隨便點讚或轉發分享", C: "仔細觀察破綻", D: "關掉影片" }},
+            { level: 'medium', q: "Deepfake 技術除了做假影片，在哪些行業應用很普遍？", a: "C", options: { A: "種田和釣魚", B: "煮飯和洗碗", C: "電影和創意產業", D: "蓋房子和修路" }},
+            { level: 'easy', q: "在餐廳使用送餐機器人，對老闆有什麼好處？", a: "D", options: { A: "食物會變好吃", B: "機器人會跳舞", C: "機器人不用充電", D: "減少人力成本，送餐更快" }},
+            { level: 'easy', q: "AI 應用在「廣告工作」上，主要的優點是什麼？", a: "A", options: { A: "提升工作效率，發掘更多可能性", B: "讓廣告變得很難看", C: "讓紙張變多", D: "讓創意消失" }},
+            { level: 'medium', q: "哪種能力是人類最強、AI 暫時學不會的？", a: "B", options: { A: "算超難的數學題", B: "創意思維、同理心與溝通理解", C: "24 小時不睡覺工作", D: "記住幾百萬本書的內容" }},
+            { level: 'medium', q: "為什麼說人類「不會」被 AI 完全取代？", a: "C", options: { A: "因為機器人很貴", B: "因為機器人不會走路", C: "因為 AI 需要人類投入數據才能學習", D: "因為人類比 AI 更有力氣" }},
+            { level: 'easy', q: "面對 AI 時代，我們小朋友應該抱持什麼態度？", a: "D", options: { A: "討厭所有科技", B: "停止學習新事物", C: "每天玩手機", D: "好好裝備自己，學習跟 AI 合作" }},
+            { level: 'hard', q: "AI 是怎麼創作者漂亮的畫或音樂的？", a: "A", options: { A: "分析大量資料後，根據資料庫快速創作", B: "AI 自己會做夢想出來的", C: "觀察大自然寫生畫出來的", D: "隨機亂畫直到好看為止" }},
+            { level: 'hard', q: "為什麼 AI 畫的畫，有時會讓我們覺得跟某位畫家的風格很像？", a: "B", options: { A: "因為畫家教它畫畫", B: "因為它融合了學習到的不同風格與影子", C: "因為 AI 是畫家的學生", D: "因為那是巧合" }},
+            { level: 'easy', q: "我們應該把 AI 視為威脅我們的敵人嗎？", a: "C", options: { A: "是的，它會搶走所有工作", B: "不是，它只是個玩具", C: "不是，它是幫我們發掘更多可能性的工具", D: "是的，它會統治世界" }},
+            { level: 'medium', q: "影片中的貓咪 IT MEOW 發現 AI 創作有什麼優點？", a: "D", options: { A: "可以幫它捉老鼠", B: "可以幫它變聰明", C: "可以幫它變更美", D: "可以批量製作不同風格的火柴人畫" }},
+            { level: 'hard', q: "社交平台是怎麼知道我們喜歡什麼內容的？", a: "A", options: { A: "透過演算法收集我們的瀏覽紀錄與足印", B: "透過讀心術", C: "透過打電話給我們", D: "透過派人跟蹤我們" }},
+            { level: 'hard', q: "人面識別技術如果被壞人利用，可能會有什麼風險？", a: "B", options: { A: "讓手機沒電", B: "快速找出人的行蹤或進行起底欺凌", C: "讓照片變模糊", D: "讓網路連不上" }},
+            { level: 'medium', q: "如果你不想讓陌生人看到你在網上發的貼文，應該調什麼？", a: "C", options: { A: "螢幕亮度", B: "聲音大小", C: "私隱權限設定", D: "網路速度" }},
+            { level: 'easy', q: "保護個人隱私最重要的一件事是什麼？", a: "D", options: { A: "每天更換用戶名稱", B: "跟所有人分享你的地址", C: "把密碼寫在筆記本上", D: "減少在網絡放重要個人資料" }}
+        ];
+
+        const quizApp = {
+            selectedQuestions: [],
+            currentStep: 0,
+            userAnswers: [],
+            selectedOption: null,
+            userInfo: { cls: '', name: '' },
+
+            init: function() {
+                const classSelect = document.getElementById('class-select');
+                const classes = [...new Set(students.map(s => s.cls))].sort();
+                classes.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.textContent = c;
+                    classSelect.appendChild(opt);
+                });
+            },
+
+            updateStudentList: function() {
+                const cls = document.getElementById('class-select').value;
+                const studentSelect = document.getElementById('student-select');
+                studentSelect.innerHTML = '<option value="">請選擇姓名</option>';
+                
+                if (cls) {
+                    studentSelect.disabled = false;
+                    studentSelect.classList.remove('bg-gray-50');
+                    const filtered = students.filter(s => s.cls === cls);
+                    filtered.forEach(s => {
+                        const opt = document.createElement('option');
+                        const displayName = `${s.id} ${s.name}`;
+                        opt.value = displayName; 
+                        opt.textContent = displayName;
+                        studentSelect.appendChild(opt);
+                    });
+                } else {
+                    studentSelect.disabled = true;
+                    studentSelect.classList.add('bg-gray-50');
+                }
+                this.validateStart();
+            },
+
+            validateStart: function() {
+                const cls = document.getElementById('class-select').value;
+                const name = document.getElementById('student-select').value;
+                const startBtn = document.getElementById('start-btn');
+                
+                if (cls && name) {
+                    startBtn.disabled = false;
+                    startBtn.classList.replace('bg-gray-400', 'bg-indigo-600');
+                    startBtn.classList.remove('cursor-not-allowed');
+                } else {
+                    startBtn.disabled = true;
+                    startBtn.classList.replace('bg-indigo-600', 'bg-gray-400');
+                    startBtn.classList.add('cursor-not-allowed');
+                }
+            },
+
+            start: function() {
+                this.userInfo.cls = document.getElementById('class-select').value;
+                this.userInfo.name = document.getElementById('student-select').value;
+                
+                // --- 分層抽題邏輯 ---
+                const shuffle = (arr) => arr.sort(() => 0.5 - Math.random());
+                
+                const easyQs = shuffle(quizData.filter(q => q.level === 'easy')).slice(0, 2);
+                const mediumQs = shuffle(quizData.filter(q => q.level === 'medium')).slice(0, 3);
+                const hardQs = shuffle(quizData.filter(q => q.level === 'hard')).slice(0, 2);
+                
+                // 混合這 7 題
+                this.selectedQuestions = shuffle([...easyQs, ...mediumQs, ...hardQs]);
+                
+                this.currentStep = 0;
+                this.userAnswers = [];
+                
+                document.getElementById('start-screen').classList.add('hidden');
+                document.getElementById('quiz-screen').classList.remove('hidden');
+                document.getElementById('user-info-display').textContent = `${this.userInfo.cls} - ${this.userInfo.name}`;
+                this.renderQuestion();
+            },
+
+            renderQuestion: function() {
+                const q = this.selectedQuestions[this.currentStep];
+                this.selectedOption = null;
+                
+                // 更新題號 (移除難度標籤顯示)
+                document.getElementById('current-index').textContent = this.currentStep + 1;
+                
+                // 進度條 (共 7 題)
+                document.getElementById('progress-bar').style.width = ((this.currentStep + 1) / 7 * 100) + '%';
+                document.getElementById('question-text').textContent = q.q;
+                
+                const optionsList = document.getElementById('options-list');
+                optionsList.innerHTML = '';
+                
+                const nextBtn = document.getElementById('next-btn');
+                nextBtn.disabled = true;
+                nextBtn.classList.replace('bg-indigo-600', 'bg-gray-400');
+                nextBtn.classList.add('cursor-not-allowed');
+
+                Object.entries(q.options).forEach(([key, val]) => {
+                    const btn = document.createElement('button');
+                    btn.className = "option-btn w-full text-left p-5 rounded-xl font-medium text-gray-700 flex items-center bg-white text-lg";
+                    btn.innerHTML = `<span class="w-8 h-8 flex items-center justify-center bg-indigo-50 rounded-lg mr-3 font-bold text-indigo-600 flex-shrink-0">${key}</span> ${val}`;
+                    btn.onclick = () => this.handleSelect(key, btn);
+                    optionsList.appendChild(btn);
+                });
+            },
+
+            handleSelect: function(key, btn) {
+                this.selectedOption = key;
+                document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('option-selected', 'border-indigo-600'));
+                btn.classList.add('option-selected', 'border-indigo-600');
+                
+                const nextBtn = document.getElementById('next-btn');
+                nextBtn.disabled = false;
+                nextBtn.classList.replace('bg-gray-400', 'bg-indigo-600');
+                nextBtn.classList.remove('cursor-not-allowed');
+            },
+
+            next: function() {
+                this.userAnswers.push(this.selectedOption);
+                this.currentStep++;
+                if (this.currentStep < 7) this.renderQuestion();
+                else this.showResults();
+            },
+
+            showResults: function() {
+                document.getElementById('quiz-screen').classList.add('hidden');
+                document.getElementById('result-screen').classList.remove('hidden');
+                document.getElementById('report-user-name').textContent = `${this.userInfo.cls} 班 ${this.userInfo.name}`;
+                
+                let correctCount = 0;
+                
+                // 1. 生成直觀對錯總表
+                const summaryContainer = document.getElementById('summary-table-container');
+                let summaryHTML = `
+                    <div class="bg-indigo-50 rounded-xl p-4 overflow-x-auto shadow-inner border border-indigo-100">
+                        <table class="w-full text-center border-collapse min-w-[300px]">
+                            <tr>
+                                ${Array.from({length: 7}, (_, i) => `<td class="p-2 font-bold text-gray-500 border-b border-indigo-200">Q${i+1}</td>`).join('')}
+                            </tr>
+                            <tr>
+                `;
+
+                // 2. 生成詳細報告
+                const reportContainer = document.getElementById('report-details');
+                reportContainer.innerHTML = '';
+
+                this.selectedQuestions.forEach((q, idx) => {
+                    const isCorrect = this.userAnswers[idx] === q.a;
+                    if (isCorrect) correctCount++;
+                    
+                    // 總表內容
+                    summaryHTML += `<td class="p-2 text-2xl">${isCorrect ? '✅' : '❌'}</td>`;
+
+                    // 詳細報告內容 (字體放大，移除難度標籤)
+                    const item = document.createElement('div');
+                    item.className = `p-6 border-l-8 rounded-r-xl shadow-sm bg-white ${isCorrect ? 'border-green-500' : 'border-red-500'}`;
+                    item.innerHTML = `
+                        <div class="flex justify-between items-start mb-3">
+                            <p class="font-bold text-gray-800 text-xl leading-tight">題 ${idx + 1}: ${q.q}</p>
+                        </div>
+                        <p class="text-lg mt-1 text-gray-600">
+                            你的答案: <span class="${isCorrect ? 'text-green-600' : 'text-red-600'} font-bold">${this.userAnswers[idx]}. ${q.options[this.userAnswers[idx]]}</span>
+                            ${!isCorrect ? `<br><span class="text-gray-500 mt-1 block">正確答案: <span class="font-bold text-green-600">${q.a}. ${q.options[q.a]}</span></span>` : ''}
+                        </p>
+                    `;
+                    reportContainer.appendChild(item);
+                });
+                
+                summaryHTML += `</tr></table></div>`;
+                summaryContainer.innerHTML = summaryHTML;
+
+                // 分數計算 (共 7 題)
+                const finalScore = Math.round((correctCount / 7) * 100);
+                document.getElementById('score-text').textContent = finalScore;
+                this.uploadData(finalScore);
+            },
+
+            uploadData: function(score) {
+                const statusDiv = document.getElementById('save-status');
+                if(!scriptURL) return;
+
+                const payload = {
+                    cls: this.userInfo.cls,
+                    name: this.userInfo.name,
+                    score: score
+                };
+
+                fetch(scriptURL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    cache: 'no-cache',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    statusDiv.innerHTML = `<span>✅</span> 結果已成功同步至 Google Sheet`;
+                    statusDiv.className = "flex items-center justify-center gap-2 text-sm font-medium text-green-600 mb-6 bg-green-50 py-2 px-4 rounded-lg mx-auto max-w-sm";
+                }).catch(err => {
+                    statusDiv.innerHTML = `<span>❌</span> 雲端同步失敗，請通知老師。`;
+                    statusDiv.className = "flex items-center justify-center gap-2 text-sm font-medium text-red-600 mb-6 bg-red-50 py-2 px-4 rounded-lg mx-auto max-w-sm";
+                });
+            }
+        };
+
+        window.onload = () => quizApp.init();
+    </script>
+</body>
+</html>
